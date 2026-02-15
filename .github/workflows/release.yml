@@ -76,8 +76,8 @@ jobs:
 
       - name: Build wheels (miru-core)
         env:
-          MIRU_VERSION: ${{ steps.vars.outputs.version }}
-          CIBW_ENVIRONMENT: MIRU_VERSION=${{ steps.vars.outputs.version }}
+          MIRU_CORE_VERSION: ${{ steps.vars.outputs.version }}
+          CIBW_ENVIRONMENT: MIRU_CORE_VERSION=${{ steps.vars.outputs.version }}
           CIBW_ARCHS: ${{ matrix.cibw_archs }}
           CIBW_BUILD: "cp39-*"
           CIBW_SKIP: "pp*"
