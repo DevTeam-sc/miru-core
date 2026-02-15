@@ -5,7 +5,7 @@
  * Licence: wxWindows Library Licence, Version 3.1
  */
 
-#include <frida-core.h>
+#include <miru-core.h>
 #include <string.h>
 
 #ifdef _MSC_VER
@@ -23,9 +23,9 @@
  * Don't propagate _DEBUG state to pyconfig as it incorrectly attempts to load
  * debug libraries that don't normally ship with Python (e.g. 2.x). Debuggers
  * wishing to spelunk the Python core can override this workaround by defining
- * _FRIDA_ENABLE_PYDEBUG.
+ * _MIRU_ENABLE_PYDEBUG.
  */
-#if defined (_DEBUG) && !defined (_FRIDA_ENABLE_PYDEBUG)
+#if defined (_DEBUG) && !defined (_MIRU_ENABLE_PYDEBUG)
 # undef _DEBUG
 # include <pyconfig.h>
 # define _DEBUG
@@ -46,54 +46,54 @@
 # endif
 #endif
 
-#define PYFRIDA_TYPE(name) \
-  (&_PYFRIDA_TYPE_VAR (name, type))
-#define PYFRIDA_TYPE_OBJECT(name) \
-  PYFRIDA_TYPE (name)->object
-#define _PYFRIDA_TYPE_VAR(name, var) \
+#define PYMIRU_TYPE(name) \
+  (&_PYMIRU_TYPE_VAR (name, type))
+#define PYMIRU_TYPE_OBJECT(name) \
+  PYMIRU_TYPE (name)->object
+#define _PYMIRU_TYPE_VAR(name, var) \
   G_PASTE (G_PASTE (G_PASTE (Py, name), _), var)
-#define PYFRIDA_DEFINE_BASETYPE(pyname, cname, init_func, destroy_func, ...) \
-  _PYFRIDA_DEFINE_TYPE_SLOTS (cname, __VA_ARGS__); \
-  _PYFRIDA_DEFINE_TYPE_SPEC (cname, pyname, Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE); \
-  static PyGObjectType _PYFRIDA_TYPE_VAR (cname, type) = \
+#define PYMIRU_DEFINE_BASETYPE(pyname, cname, init_func, destroy_func, ...) \
+  _PYMIRU_DEFINE_TYPE_SLOTS (cname, __VA_ARGS__); \
+  _PYMIRU_DEFINE_TYPE_SPEC (cname, pyname, Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE); \
+  static PyGObjectType _PYMIRU_TYPE_VAR (cname, type) = \
   { \
     .parent = NULL, \
     .object = NULL, \
     .init_from_handle = (PyGObjectInitFromHandleFunc) init_func, \
     .destroy = destroy_func, \
   }
-#define PYFRIDA_DEFINE_TYPE(pyname, cname, parent_cname, init_func, destroy_func, ...) \
-  _PYFRIDA_DEFINE_TYPE_SLOTS (cname, __VA_ARGS__); \
-  _PYFRIDA_DEFINE_TYPE_SPEC (cname, pyname, Py_TPFLAGS_DEFAULT); \
-  static PyGObjectType _PYFRIDA_TYPE_VAR (cname, type) = \
+#define PYMIRU_DEFINE_TYPE(pyname, cname, parent_cname, init_func, destroy_func, ...) \
+  _PYMIRU_DEFINE_TYPE_SLOTS (cname, __VA_ARGS__); \
+  _PYMIRU_DEFINE_TYPE_SPEC (cname, pyname, Py_TPFLAGS_DEFAULT); \
+  static PyGObjectType _PYMIRU_TYPE_VAR (cname, type) = \
   { \
-    .parent = PYFRIDA_TYPE (parent_cname), \
+    .parent = PYMIRU_TYPE (parent_cname), \
     .object = NULL, \
     .init_from_handle = (PyGObjectInitFromHandleFunc) init_func, \
     .destroy = destroy_func, \
   }
-#define PYFRIDA_REGISTER_TYPE(cname, gtype) \
+#define PYMIRU_REGISTER_TYPE(cname, gtype) \
   G_BEGIN_DECLS \
   { \
-    PyGObjectType * t = PYFRIDA_TYPE (cname); \
-    t->object = PyType_FromSpecWithBases (&_PYFRIDA_TYPE_VAR (cname, spec), \
+    PyGObjectType * t = PYMIRU_TYPE (cname); \
+    t->object = PyType_FromSpecWithBases (&_PYMIRU_TYPE_VAR (cname, spec), \
         (t->parent != NULL) ? PyTuple_Pack (1, t->parent->object) : NULL); \
     PyGObject_register_type (gtype, t); \
     Py_IncRef (t->object); \
     PyModule_AddObject (module, G_STRINGIFY (cname), t->object); \
   } \
   G_END_DECLS
-#define _PYFRIDA_DEFINE_TYPE_SPEC(cname, pyname, type_flags) \
-  static PyType_Spec _PYFRIDA_TYPE_VAR (cname, spec) = \
+#define _PYMIRU_DEFINE_TYPE_SPEC(cname, pyname, type_flags) \
+  static PyType_Spec _PYMIRU_TYPE_VAR (cname, spec) = \
   { \
     .name = pyname, \
     .basicsize = sizeof (G_PASTE (Py, cname)), \
     .itemsize = 0, \
     .flags = type_flags, \
-    .slots = _PYFRIDA_TYPE_VAR (cname, slots), \
+    .slots = _PYMIRU_TYPE_VAR (cname, slots), \
   }
-#define _PYFRIDA_DEFINE_TYPE_SLOTS(cname, ...) \
-  static PyType_Slot _PYFRIDA_TYPE_VAR (cname, slots)[] = \
+#define _PYMIRU_DEFINE_TYPE_SLOTS(cname, ...) \
+  static PyType_Slot _PYMIRU_TYPE_VAR (cname, slots)[] = \
   { \
     __VA_ARGS__ \
     { 0 }, \
@@ -103,7 +103,7 @@
 #define PY_GOBJECT_HANDLE(o) (PY_GOBJECT (o)->handle)
 #define PY_GOBJECT_SIGNAL_CLOSURE(o) ((PyGObjectSignalClosure *) (o))
 
-#define PyFrida_RETURN_NONE \
+#define PyMiru_RETURN_NONE \
   G_STMT_START \
   { \
     Py_IncRef (Py_None); \
@@ -111,7 +111,7 @@
   } \
   G_STMT_END
 
-static struct PyModuleDef PyFrida_moduledef = { PyModuleDef_HEAD_INIT, "_frida", "Frida", -1, NULL, };
+static struct PyModuleDef PyMiru_moduledef = { PyModuleDef_HEAD_INIT, "_miru", "Miru", -1, NULL, };
 
 static volatile gint toplevel_objects_alive = 0;
 
@@ -123,7 +123,7 @@ static PyObject * datetime_constructor;
 static initproc PyGObject_tp_init;
 static destructor PyGObject_tp_dealloc;
 static GHashTable * pygobject_type_spec_by_type;
-static GHashTable * frida_exception_by_error_code;
+static GHashTable * miru_exception_by_error_code;
 static PyObject * cancelled_exception;
 
 typedef struct _PyGObject                      PyGObject;
@@ -153,8 +153,8 @@ typedef struct _PyFileMonitor                  PyFileMonitor;
 typedef struct _PyIOStream                     PyIOStream;
 typedef struct _PyCancellable                  PyCancellable;
 
-#define FRIDA_TYPE_PYTHON_AUTHENTICATION_SERVICE (frida_python_authentication_service_get_type ())
-G_DECLARE_FINAL_TYPE (FridaPythonAuthenticationService, frida_python_authentication_service, FRIDA, PYTHON_AUTHENTICATION_SERVICE, GObject)
+#define MIRU_TYPE_PYTHON_AUTHENTICATION_SERVICE (miru_python_authentication_service_get_type ())
+G_DECLARE_FINAL_TYPE (MiruPythonAuthenticationService, miru_python_authentication_service, MIRU, PYTHON_AUTHENTICATION_SERVICE, GObject)
 
 typedef void (* PyGObjectInitFromHandleFunc) (PyObject * self, gpointer handle);
 
@@ -290,7 +290,7 @@ struct _PyEndpointParameters
   PyGObject parent;
 };
 
-struct _FridaPythonAuthenticationService
+struct _MiruPythonAuthenticationService
 {
   GObject parent;
   PyObject * callback;
@@ -391,25 +391,25 @@ static int PyDeviceManager_init (PyDeviceManager * self, PyObject * args, PyObje
 static void PyDeviceManager_dealloc (PyDeviceManager * self);
 static PyObject * PyDeviceManager_close (PyDeviceManager * self);
 static PyObject * PyDeviceManager_get_device_matching (PyDeviceManager * self, PyObject * args);
-static gboolean PyDeviceManager_is_matching_device (FridaDevice * device, PyObject * predicate);
+static gboolean PyDeviceManager_is_matching_device (MiruDevice * device, PyObject * predicate);
 static PyObject * PyDeviceManager_enumerate_devices (PyDeviceManager * self);
 static PyObject * PyDeviceManager_add_remote_device (PyDeviceManager * self, PyObject * args, PyObject * kw);
 static PyObject * PyDeviceManager_remove_remote_device (PyDeviceManager * self, PyObject * args, PyObject * kw);
-static FridaRemoteDeviceOptions * PyDeviceManager_parse_remote_device_options (const gchar * certificate_value, const gchar * origin,
+static MiruRemoteDeviceOptions * PyDeviceManager_parse_remote_device_options (const gchar * certificate_value, const gchar * origin,
     const gchar * token, gint keepalive_interval);
 
-static PyObject * PyDevice_new_take_handle (FridaDevice * handle);
+static PyObject * PyDevice_new_take_handle (MiruDevice * handle);
 static int PyDevice_init (PyDevice * self, PyObject * args, PyObject * kw);
-static void PyDevice_init_from_handle (PyDevice * self, FridaDevice * handle);
+static void PyDevice_init_from_handle (PyDevice * self, MiruDevice * handle);
 static void PyDevice_dealloc (PyDevice * self);
 static PyObject * PyDevice_repr (PyDevice * self);
 static PyObject * PyDevice_is_lost (PyDevice * self);
 static PyObject * PyDevice_query_system_parameters (PyDevice * self);
 static PyObject * PyDevice_get_frontmost_application (PyDevice * self, PyObject * args, PyObject * kw);
 static PyObject * PyDevice_enumerate_applications (PyDevice * self, PyObject * args, PyObject * kw);
-static FridaApplicationQueryOptions * PyDevice_parse_application_query_options (PyObject * identifiers_value, const gchar * scope_value);
+static MiruApplicationQueryOptions * PyDevice_parse_application_query_options (PyObject * identifiers_value, const gchar * scope_value);
 static PyObject * PyDevice_enumerate_processes (PyDevice * self, PyObject * args, PyObject * kw);
-static FridaProcessQueryOptions * PyDevice_parse_process_query_options (PyObject * pids_value, const gchar * scope_value);
+static MiruProcessQueryOptions * PyDevice_parse_process_query_options (PyObject * pids_value, const gchar * scope_value);
 static PyObject * PyDevice_enable_spawn_gating (PyDevice * self);
 static PyObject * PyDevice_disable_spawn_gating (PyDevice * self);
 static PyObject * PyDevice_enumerate_pending_spawn (PyDevice * self);
@@ -419,56 +419,56 @@ static PyObject * PyDevice_input (PyDevice * self, PyObject * args);
 static PyObject * PyDevice_resume (PyDevice * self, PyObject * args);
 static PyObject * PyDevice_kill (PyDevice * self, PyObject * args);
 static PyObject * PyDevice_attach (PyDevice * self, PyObject * args, PyObject * kw);
-static FridaSessionOptions * PyDevice_parse_session_options (const gchar * realm_value, guint persist_timeout);
+static MiruSessionOptions * PyDevice_parse_session_options (const gchar * realm_value, guint persist_timeout);
 static PyObject * PyDevice_inject_library_file (PyDevice * self, PyObject * args);
 static PyObject * PyDevice_inject_library_blob (PyDevice * self, PyObject * args);
 static PyObject * PyDevice_open_channel (PyDevice * self, PyObject * args);
 static PyObject * PyDevice_open_service (PyDevice * self, PyObject * args);
 static PyObject * PyDevice_unpair (PyDevice * self);
 
-static PyObject * PyApplication_new_take_handle (FridaApplication * handle);
+static PyObject * PyApplication_new_take_handle (MiruApplication * handle);
 static int PyApplication_init (PyApplication * self, PyObject * args, PyObject * kw);
-static void PyApplication_init_from_handle (PyApplication * self, FridaApplication * handle);
+static void PyApplication_init_from_handle (PyApplication * self, MiruApplication * handle);
 static void PyApplication_dealloc (PyApplication * self);
 static PyObject * PyApplication_repr (PyApplication * self);
 static PyObject * PyApplication_marshal_parameters_dict (GHashTable * dict);
 
-static PyObject * PyProcess_new_take_handle (FridaProcess * handle);
+static PyObject * PyProcess_new_take_handle (MiruProcess * handle);
 static int PyProcess_init (PyProcess * self, PyObject * args, PyObject * kw);
-static void PyProcess_init_from_handle (PyProcess * self, FridaProcess * handle);
+static void PyProcess_init_from_handle (PyProcess * self, MiruProcess * handle);
 static void PyProcess_dealloc (PyProcess * self);
 static PyObject * PyProcess_repr (PyProcess * self);
 static PyObject * PyProcess_marshal_parameters_dict (GHashTable * dict);
 
-static PyObject * PySpawn_new_take_handle (FridaSpawn * handle);
+static PyObject * PySpawn_new_take_handle (MiruSpawn * handle);
 static int PySpawn_init (PySpawn * self, PyObject * args, PyObject * kw);
-static void PySpawn_init_from_handle (PySpawn * self, FridaSpawn * handle);
+static void PySpawn_init_from_handle (PySpawn * self, MiruSpawn * handle);
 static void PySpawn_dealloc (PySpawn * self);
 static PyObject * PySpawn_repr (PySpawn * self);
 
-static PyObject * PyChild_new_take_handle (FridaChild * handle);
+static PyObject * PyChild_new_take_handle (MiruChild * handle);
 static int PyChild_init (PyChild * self, PyObject * args, PyObject * kw);
-static void PyChild_init_from_handle (PyChild * self, FridaChild * handle);
+static void PyChild_init_from_handle (PyChild * self, MiruChild * handle);
 static void PyChild_dealloc (PyChild * self);
 static PyObject * PyChild_repr (PyChild * self);
 
 static int PyCrash_init (PyCrash * self, PyObject * args, PyObject * kw);
-static void PyCrash_init_from_handle (PyCrash * self, FridaCrash * handle);
+static void PyCrash_init_from_handle (PyCrash * self, MiruCrash * handle);
 static void PyCrash_dealloc (PyCrash * self);
 static PyObject * PyCrash_repr (PyCrash * self);
 
-static PyObject * PyBus_new_take_handle (FridaBus * handle);
+static PyObject * PyBus_new_take_handle (MiruBus * handle);
 static PyObject * PyBus_attach (PySession * self);
 static PyObject * PyBus_post (PyScript * self, PyObject * args, PyObject * kw);
 
-static PyObject * PyService_new_take_handle (FridaService * handle);
+static PyObject * PyService_new_take_handle (MiruService * handle);
 static PyObject * PyService_activate (PyService * self);
 static PyObject * PyService_cancel (PyService * self);
 static PyObject * PyService_request (PyService * self, PyObject * args);
 
-static PyObject * PySession_new_take_handle (FridaSession * handle);
+static PyObject * PySession_new_take_handle (MiruSession * handle);
 static int PySession_init (PySession * self, PyObject * args, PyObject * kw);
-static void PySession_init_from_handle (PySession * self, FridaSession * handle);
+static void PySession_init_from_handle (PySession * self, MiruSession * handle);
 static PyObject * PySession_repr (PySession * self);
 static PyObject * PySession_is_detached (PySession * self);
 static PyObject * PySession_detach (PySession * self);
@@ -479,16 +479,16 @@ static PyObject * PySession_create_script (PySession * self, PyObject * args, Py
 static PyObject * PySession_create_script_from_bytes (PySession * self, PyObject * args, PyObject * kw);
 static PyObject * PySession_compile_script (PySession * self, PyObject * args, PyObject * kw);
 static PyObject * PySession_snapshot_script (PySession * self, PyObject * args, PyObject * kw);
-static FridaScriptOptions * PySession_parse_script_options (const gchar * name, gconstpointer snapshot_data, gsize snapshot_size,
+static MiruScriptOptions * PySession_parse_script_options (const gchar * name, gconstpointer snapshot_data, gsize snapshot_size,
     const gchar * runtime_value);
 static PyObject * PySession_snapshot_script (PySession * self, PyObject * args, PyObject * kw);
-static FridaSnapshotOptions * PySession_parse_snapshot_options (const gchar * warmup_script, const gchar * runtime_value);
+static MiruSnapshotOptions * PySession_parse_snapshot_options (const gchar * warmup_script, const gchar * runtime_value);
 static PyObject * PySession_setup_peer_connection (PySession * self, PyObject * args, PyObject * kw);
-static FridaPeerOptions * PySession_parse_peer_options (const gchar * stun_server, PyObject * relays);
+static MiruPeerOptions * PySession_parse_peer_options (const gchar * stun_server, PyObject * relays);
 static PyObject * PySession_join_portal (PySession * self, PyObject * args, PyObject * kw);
-static FridaPortalOptions * PySession_parse_portal_options (const gchar * certificate_value, const gchar * token, PyObject * acl_value);
+static MiruPortalOptions * PySession_parse_portal_options (const gchar * certificate_value, const gchar * token, PyObject * acl_value);
 
-static PyObject * PyScript_new_take_handle (FridaScript * handle);
+static PyObject * PyScript_new_take_handle (MiruScript * handle);
 static PyObject * PyScript_is_destroyed (PyScript * self);
 static PyObject * PyScript_load (PyScript * self);
 static PyObject * PyScript_unload (PyScript * self);
@@ -498,15 +498,15 @@ static PyObject * PyScript_enable_debugger (PyScript * self, PyObject * args, Py
 static PyObject * PyScript_disable_debugger (PyScript * self);
 
 static int PyRelay_init (PyRelay * self, PyObject * args, PyObject * kw);
-static void PyRelay_init_from_handle (PyRelay * self, FridaRelay * handle);
+static void PyRelay_init_from_handle (PyRelay * self, MiruRelay * handle);
 static void PyRelay_dealloc (PyRelay * self);
 static PyObject * PyRelay_repr (PyRelay * self);
 
-static PyObject * PyPortalMembership_new_take_handle (FridaPortalMembership * handle);
+static PyObject * PyPortalMembership_new_take_handle (MiruPortalMembership * handle);
 static PyObject * PyPortalMembership_terminate (PyPortalMembership * self);
 
 static int PyPortalService_init (PyPortalService * self, PyObject * args, PyObject * kw);
-static void PyPortalService_init_from_handle (PyPortalService * self, FridaPortalService * handle);
+static void PyPortalService_init_from_handle (PyPortalService * self, MiruPortalService * handle);
 static void PyPortalService_dealloc (PyPortalService * self);
 static PyObject * PyPortalService_start (PyPortalService * self);
 static PyObject * PyPortalService_stop (PyPortalService * self);
@@ -520,20 +520,20 @@ static PyObject * PyPortalService_untag (PyScript * self, PyObject * args, PyObj
 
 static int PyEndpointParameters_init (PyEndpointParameters * self, PyObject * args, PyObject * kw);
 
-static FridaPythonAuthenticationService * frida_python_authentication_service_new (PyObject * callback);
-static void frida_python_authentication_service_iface_init (gpointer g_iface, gpointer iface_data);
-static void frida_python_authentication_service_dispose (GObject * object);
-static void frida_python_authentication_service_authenticate (FridaAuthenticationService * service, const gchar * token,
+static MiruPythonAuthenticationService * miru_python_authentication_service_new (PyObject * callback);
+static void miru_python_authentication_service_iface_init (gpointer g_iface, gpointer iface_data);
+static void miru_python_authentication_service_dispose (GObject * object);
+static void miru_python_authentication_service_authenticate (MiruAuthenticationService * service, const gchar * token,
     GCancellable * cancellable, GAsyncReadyCallback callback, gpointer user_data);
-static gchar * frida_python_authentication_service_authenticate_finish (FridaAuthenticationService * service, GAsyncResult * result,
+static gchar * miru_python_authentication_service_authenticate_finish (MiruAuthenticationService * service, GAsyncResult * result,
     GError ** error);
-static void frida_python_authentication_service_do_authenticate (GTask * task, FridaPythonAuthenticationService * self);
+static void miru_python_authentication_service_do_authenticate (GTask * task, MiruPythonAuthenticationService * self);
 
 static int PyCompiler_init (PyCompiler * self, PyObject * args, PyObject * kw);
 static void PyCompiler_dealloc (PyCompiler * self);
 static PyObject * PyCompiler_build (PyCompiler * self, PyObject * args, PyObject * kw);
 static PyObject * PyCompiler_watch (PyCompiler * self, PyObject * args, PyObject * kw);
-static gboolean PyCompiler_set_options (FridaCompilerOptions * options, const gchar * project_root_value, const gchar * output_format_value,
+static gboolean PyCompiler_set_options (MiruCompilerOptions * options, const gchar * project_root_value, const gchar * output_format_value,
     const gchar * bundle_format_value, const gchar * type_check_value, const gchar * source_maps_value, const gchar * compression_value,
     const gchar * platform_value, PyObject * externals_value);
 
@@ -544,24 +544,24 @@ static PyObject * PyPackageManager_get_registry (PyPackageManager * self, void *
 static int PyPackageManager_set_registry (PyPackageManager * self, PyObject * val, void * closure);
 static PyObject * PyPackageManager_search (PyPackageManager * self, PyObject * args, PyObject * kw);
 static PyObject * PyPackageManager_install (PyPackageManager * self, PyObject * args, PyObject * kw);
-static FridaPackageInstallOptions * PyPackageManager_parse_install_options (const gchar * project_root, const char * role_value,
+static MiruPackageInstallOptions * PyPackageManager_parse_install_options (const gchar * project_root, const char * role_value,
     PyObject * specs_value, PyObject * omits_value);
 
-static PyObject * PyPackage_new_take_handle (FridaPackage * handle);
+static PyObject * PyPackage_new_take_handle (MiruPackage * handle);
 static int PyPackage_init (PyPackage * self, PyObject * args, PyObject * kw);
-static void PyPackage_init_from_handle (PyPackage * self, FridaPackage * handle);
+static void PyPackage_init_from_handle (PyPackage * self, MiruPackage * handle);
 static void PyPackage_dealloc (PyPackage * self);
 static PyObject * PyPackage_repr (PyPackage * self);
 
-static PyObject * PyPackageSearchResult_new_take_handle (FridaPackageSearchResult * handle);
+static PyObject * PyPackageSearchResult_new_take_handle (MiruPackageSearchResult * handle);
 static int PyPackageSearchResult_init (PyPackageSearchResult * self, PyObject * args, PyObject * kw);
-static void PyPackageSearchResult_init_from_handle (PyPackageSearchResult * self, FridaPackageSearchResult * handle);
+static void PyPackageSearchResult_init_from_handle (PyPackageSearchResult * self, MiruPackageSearchResult * handle);
 static void PyPackageSearchResult_dealloc (PyPackageSearchResult * self);
 static PyObject * PyPackageSearchResult_repr (PyPackageSearchResult * self);
 
-static PyObject * PyPackageInstallResult_new_take_handle (FridaPackageInstallResult * handle);
+static PyObject * PyPackageInstallResult_new_take_handle (MiruPackageInstallResult * handle);
 static int PyPackageInstallResult_init (PyPackageInstallResult * self, PyObject * args, PyObject * kw);
-static void PyPackageInstallResult_init_from_handle (PyPackageInstallResult * self, FridaPackageInstallResult * handle);
+static void PyPackageInstallResult_init_from_handle (PyPackageInstallResult * self, MiruPackageInstallResult * handle);
 static void PyPackageInstallResult_dealloc (PyPackageInstallResult * self);
 static PyObject * PyPackageInstallResult_repr (PyPackageInstallResult * self);
 
@@ -596,9 +596,9 @@ static void PyCancellable_on_cancelled (GCancellable * cancellable, PyObject * c
 static void PyCancellable_destroy_callback (PyObject * callback);
 static PyObject * PyCancellable_cancel (PyCancellable * self);
 
-static PyObject * PyFrida_raise (GError * error);
-static gchar * PyFrida_repr (PyObject * obj);
-static guint PyFrida_get_max_argument_count (PyObject * callable);
+static PyObject * PyMiru_raise (GError * error);
+static gchar * PyMiru_repr (PyObject * obj);
+static guint PyMiru_get_max_argument_count (PyObject * callable);
 
 static PyMethodDef PyGObject_methods[] =
 {
@@ -856,22 +856,22 @@ static PyMethodDef PyCancellable_methods[] =
   { NULL }
 };
 
-PYFRIDA_DEFINE_BASETYPE ("_frida.Object", GObject, NULL, g_object_unref,
-  { Py_tp_doc, "Frida Object" },
+PYMIRU_DEFINE_BASETYPE ("_miru.Object", GObject, NULL, g_object_unref,
+  { Py_tp_doc, "Miru Object" },
   { Py_tp_init, PyGObject_init },
   { Py_tp_dealloc, PyGObject_dealloc },
   { Py_tp_methods, PyGObject_methods },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.DeviceManager", DeviceManager, GObject, NULL, frida_unref,
-  { Py_tp_doc, "Frida Device Manager" },
+PYMIRU_DEFINE_TYPE ("_miru.DeviceManager", DeviceManager, GObject, NULL, miru_unref,
+  { Py_tp_doc, "Miru Device Manager" },
   { Py_tp_init, PyDeviceManager_init },
   { Py_tp_dealloc, PyDeviceManager_dealloc },
   { Py_tp_methods, PyDeviceManager_methods },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.Device", Device, GObject, PyDevice_init_from_handle, frida_unref,
-  { Py_tp_doc, "Frida Device" },
+PYMIRU_DEFINE_TYPE ("_miru.Device", Device, GObject, PyDevice_init_from_handle, miru_unref,
+  { Py_tp_doc, "Miru Device" },
   { Py_tp_init, PyDevice_init },
   { Py_tp_dealloc, PyDevice_dealloc },
   { Py_tp_repr, PyDevice_repr },
@@ -879,104 +879,104 @@ PYFRIDA_DEFINE_TYPE ("_frida.Device", Device, GObject, PyDevice_init_from_handle
   { Py_tp_members, PyDevice_members },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.Application", Application, GObject, PyApplication_init_from_handle, g_object_unref,
-  { Py_tp_doc, "Frida Application" },
+PYMIRU_DEFINE_TYPE ("_miru.Application", Application, GObject, PyApplication_init_from_handle, g_object_unref,
+  { Py_tp_doc, "Miru Application" },
   { Py_tp_init, PyApplication_init },
   { Py_tp_dealloc, PyApplication_dealloc },
   { Py_tp_repr, PyApplication_repr },
   { Py_tp_members, PyApplication_members },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.Process", Process, GObject, PyProcess_init_from_handle, g_object_unref,
-  { Py_tp_doc, "Frida Process" },
+PYMIRU_DEFINE_TYPE ("_miru.Process", Process, GObject, PyProcess_init_from_handle, g_object_unref,
+  { Py_tp_doc, "Miru Process" },
   { Py_tp_init, PyProcess_init },
   { Py_tp_dealloc, PyProcess_dealloc },
   { Py_tp_repr, PyProcess_repr },
   { Py_tp_members, PyProcess_members },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.Spawn", Spawn, GObject, PySpawn_init_from_handle, g_object_unref,
-  { Py_tp_doc, "Frida Spawn" },
+PYMIRU_DEFINE_TYPE ("_miru.Spawn", Spawn, GObject, PySpawn_init_from_handle, g_object_unref,
+  { Py_tp_doc, "Miru Spawn" },
   { Py_tp_init, PySpawn_init },
   { Py_tp_dealloc, PySpawn_dealloc },
   { Py_tp_repr, PySpawn_repr },
   { Py_tp_members, PySpawn_members },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.Child", Child, GObject, PyChild_init_from_handle, g_object_unref,
-  { Py_tp_doc, "Frida Child" },
+PYMIRU_DEFINE_TYPE ("_miru.Child", Child, GObject, PyChild_init_from_handle, g_object_unref,
+  { Py_tp_doc, "Miru Child" },
   { Py_tp_init, PyChild_init },
   { Py_tp_dealloc, PyChild_dealloc },
   { Py_tp_repr, PyChild_repr },
   { Py_tp_members, PyChild_members },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.Crash", Crash, GObject, PyCrash_init_from_handle, g_object_unref,
-  { Py_tp_doc, "Frida Crash Details" },
+PYMIRU_DEFINE_TYPE ("_miru.Crash", Crash, GObject, PyCrash_init_from_handle, g_object_unref,
+  { Py_tp_doc, "Miru Crash Details" },
   { Py_tp_init, PyCrash_init },
   { Py_tp_dealloc, PyCrash_dealloc },
   { Py_tp_repr, PyCrash_repr },
   { Py_tp_members, PyCrash_members },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.Bus", Bus, GObject, NULL, g_object_unref,
-  { Py_tp_doc, "Frida Message Bus" },
+PYMIRU_DEFINE_TYPE ("_miru.Bus", Bus, GObject, NULL, g_object_unref,
+  { Py_tp_doc, "Miru Message Bus" },
   { Py_tp_methods, PyBus_methods },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.Service", Service, GObject, NULL, g_object_unref,
-  { Py_tp_doc, "Frida Service" },
+PYMIRU_DEFINE_TYPE ("_miru.Service", Service, GObject, NULL, g_object_unref,
+  { Py_tp_doc, "Miru Service" },
   { Py_tp_methods, PyService_methods },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.Session", Session, GObject, PySession_init_from_handle, frida_unref,
-  { Py_tp_doc, "Frida Session" },
+PYMIRU_DEFINE_TYPE ("_miru.Session", Session, GObject, PySession_init_from_handle, miru_unref,
+  { Py_tp_doc, "Miru Session" },
   { Py_tp_init, PySession_init },
   { Py_tp_repr, PySession_repr },
   { Py_tp_methods, PySession_methods },
   { Py_tp_members, PySession_members },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.Script", Script, GObject, NULL, frida_unref,
-  { Py_tp_doc, "Frida Script" },
+PYMIRU_DEFINE_TYPE ("_miru.Script", Script, GObject, NULL, miru_unref,
+  { Py_tp_doc, "Miru Script" },
   { Py_tp_methods, PyScript_methods },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.Relay", Relay, GObject, PyRelay_init_from_handle, g_object_unref,
-  { Py_tp_doc, "Frida Relay" },
+PYMIRU_DEFINE_TYPE ("_miru.Relay", Relay, GObject, PyRelay_init_from_handle, g_object_unref,
+  { Py_tp_doc, "Miru Relay" },
   { Py_tp_init, PyRelay_init },
   { Py_tp_dealloc, PyRelay_dealloc },
   { Py_tp_repr, PyRelay_repr },
   { Py_tp_members, PyRelay_members },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.PortalMembership", PortalMembership, GObject, NULL, frida_unref,
-  { Py_tp_doc, "Frida Portal Membership" },
+PYMIRU_DEFINE_TYPE ("_miru.PortalMembership", PortalMembership, GObject, NULL, miru_unref,
+  { Py_tp_doc, "Miru Portal Membership" },
   { Py_tp_methods, PyPortalMembership_methods },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.PortalService", PortalService, GObject, PyPortalService_init_from_handle, frida_unref,
-  { Py_tp_doc, "Frida Portal Service" },
+PYMIRU_DEFINE_TYPE ("_miru.PortalService", PortalService, GObject, PyPortalService_init_from_handle, miru_unref,
+  { Py_tp_doc, "Miru Portal Service" },
   { Py_tp_init, PyPortalService_init },
   { Py_tp_dealloc, PyPortalService_dealloc },
   { Py_tp_methods, PyPortalService_methods },
   { Py_tp_members, PyPortalService_members },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.EndpointParameters", EndpointParameters, GObject, NULL, g_object_unref,
-  { Py_tp_doc, "Frida EndpointParameters" },
+PYMIRU_DEFINE_TYPE ("_miru.EndpointParameters", EndpointParameters, GObject, NULL, g_object_unref,
+  { Py_tp_doc, "Miru EndpointParameters" },
   { Py_tp_init, PyEndpointParameters_init },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.Compiler", Compiler, GObject, NULL, frida_unref,
-  { Py_tp_doc, "Frida Compiler" },
+PYMIRU_DEFINE_TYPE ("_miru.Compiler", Compiler, GObject, NULL, miru_unref,
+  { Py_tp_doc, "Miru Compiler" },
   { Py_tp_init, PyCompiler_init },
   { Py_tp_dealloc, PyCompiler_dealloc },
   { Py_tp_methods, PyCompiler_methods },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.PackageManager", PackageManager, GObject, NULL, frida_unref,
-  { Py_tp_doc, "Frida Package Manager" },
+PYMIRU_DEFINE_TYPE ("_miru.PackageManager", PackageManager, GObject, NULL, miru_unref,
+  { Py_tp_doc, "Miru Package Manager" },
   { Py_tp_init, PyPackageManager_init },
   { Py_tp_dealloc, PyPackageManager_dealloc },
   { Py_tp_repr, PyPackageManager_repr },
@@ -984,46 +984,46 @@ PYFRIDA_DEFINE_TYPE ("_frida.PackageManager", PackageManager, GObject, NULL, fri
   { Py_tp_methods, PyPackageManager_methods },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.Package", Package, GObject, PyPackage_init_from_handle, g_object_unref,
-  { Py_tp_doc, "Frida Package" },
+PYMIRU_DEFINE_TYPE ("_miru.Package", Package, GObject, PyPackage_init_from_handle, g_object_unref,
+  { Py_tp_doc, "Miru Package" },
   { Py_tp_init, PyPackage_init },
   { Py_tp_dealloc, PyPackage_dealloc },
   { Py_tp_repr, PyPackage_repr },
   { Py_tp_members, PyPackage_members },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.PackageSearchResult", PackageSearchResult, GObject, PyPackageSearchResult_init_from_handle, g_object_unref,
-  { Py_tp_doc, "Frida Package Search Result" },
+PYMIRU_DEFINE_TYPE ("_miru.PackageSearchResult", PackageSearchResult, GObject, PyPackageSearchResult_init_from_handle, g_object_unref,
+  { Py_tp_doc, "Miru Package Search Result" },
   { Py_tp_init, PyPackageSearchResult_init },
   { Py_tp_dealloc, PyPackageSearchResult_dealloc },
   { Py_tp_repr, PyPackageSearchResult_repr },
   { Py_tp_members, PyPackageSearchResult_members },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.PackageInstallResult", PackageInstallResult, GObject, PyPackageInstallResult_init_from_handle, g_object_unref,
-  { Py_tp_doc, "Frida Package Install Result" },
+PYMIRU_DEFINE_TYPE ("_miru.PackageInstallResult", PackageInstallResult, GObject, PyPackageInstallResult_init_from_handle, g_object_unref,
+  { Py_tp_doc, "Miru Package Install Result" },
   { Py_tp_init, PyPackageInstallResult_init },
   { Py_tp_dealloc, PyPackageInstallResult_dealloc },
   { Py_tp_repr, PyPackageInstallResult_repr },
   { Py_tp_members, PyPackageInstallResult_members },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.FileMonitor", FileMonitor, GObject, NULL, frida_unref,
-  { Py_tp_doc, "Frida File Monitor" },
+PYMIRU_DEFINE_TYPE ("_miru.FileMonitor", FileMonitor, GObject, NULL, miru_unref,
+  { Py_tp_doc, "Miru File Monitor" },
   { Py_tp_init, PyFileMonitor_init },
   { Py_tp_dealloc, PyFileMonitor_dealloc },
   { Py_tp_methods, PyFileMonitor_methods },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.IOStream", IOStream, GObject, PyIOStream_init_from_handle, g_object_unref,
-  { Py_tp_doc, "Frida IOStream" },
+PYMIRU_DEFINE_TYPE ("_miru.IOStream", IOStream, GObject, PyIOStream_init_from_handle, g_object_unref,
+  { Py_tp_doc, "Miru IOStream" },
   { Py_tp_init, PyIOStream_init },
   { Py_tp_repr, PyIOStream_repr },
   { Py_tp_methods, PyIOStream_methods },
 );
 
-PYFRIDA_DEFINE_TYPE ("_frida.Cancellable", Cancellable, GObject, NULL, g_object_unref,
-  { Py_tp_doc, "Frida Cancellable" },
+PYMIRU_DEFINE_TYPE ("_miru.Cancellable", Cancellable, GObject, NULL, g_object_unref,
+  { Py_tp_doc, "Miru Cancellable" },
   { Py_tp_init, PyCancellable_init },
   { Py_tp_repr, PyCancellable_repr },
   { Py_tp_methods, PyCancellable_methods },
@@ -1036,7 +1036,7 @@ PyGObject_new_take_handle (gpointer handle, const PyGObjectType * pytype)
   PyObject * object;
 
   if (handle == NULL)
-    PyFrida_RETURN_NONE;
+    PyMiru_RETURN_NONE;
 
   object = PyGObject_try_get_from_handle (handle);
   if (object == NULL)
@@ -1066,7 +1066,7 @@ static int
 PyGObject_init (PyGObject * self)
 {
   self->handle = NULL;
-  self->type = PYFRIDA_TYPE (GObject);
+  self->type = PYMIRU_TYPE (GObject);
 
   self->signal_closures = NULL;
 
@@ -1140,7 +1140,7 @@ PyGObject_on (PyGObject * self, PyObject * args)
   if (!PyGObject_parse_signal_method_args (args, instance_type, &signal_id, &callback))
     return NULL;
 
-  max_arg_count = PyFrida_get_max_argument_count (callback);
+  max_arg_count = PyMiru_get_max_argument_count (callback);
   if (max_arg_count != G_MAXUINT)
   {
     g_signal_query (signal_id, &query);
@@ -1156,7 +1156,7 @@ PyGObject_on (PyGObject * self, PyObject * args)
 
   self->signal_closures = g_slist_prepend (self->signal_closures, closure);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 
 too_many_arguments:
   {
@@ -1188,7 +1188,7 @@ PyGObject_off (PyGObject * self, PyObject * args)
   num_matches = g_signal_handlers_disconnect_matched (self->handle, G_SIGNAL_MATCH_CLOSURE, signal_id, 0, closure, NULL, NULL);
   g_assert (num_matches == 1);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 
 unknown_callback:
   {
@@ -1270,7 +1270,7 @@ invalid_signal_name:
 static const gchar *
 PyGObject_class_name_from_c (const gchar * cname)
 {
-  if (g_str_has_prefix (cname, "Frida"))
+  if (g_str_has_prefix (cname, "Miru"))
     return cname + 5;
 
   return cname;
@@ -1445,7 +1445,7 @@ static PyObject *
 PyGObject_marshal_string (const gchar * str)
 {
   if (str == NULL)
-    PyFrida_RETURN_NONE;
+    PyMiru_RETURN_NONE;
 
   return PyUnicode_FromString (str);
 }
@@ -1476,7 +1476,7 @@ PyGObject_marshal_datetime (const gchar * iso8601_text)
 
   raw_dt = g_date_time_new_from_iso8601 (iso8601_text, NULL);
   if (raw_dt == NULL)
-    PyFrida_RETURN_NONE;
+    PyMiru_RETURN_NONE;
 
   dt = g_date_time_to_local (raw_dt);
 
@@ -1502,7 +1502,7 @@ PyGObject_marshal_strv (gchar * const * strv, gint length)
   gint i;
 
   if (strv == NULL)
-    PyFrida_RETURN_NONE;
+    PyMiru_RETURN_NONE;
 
   result = PyList_New (length);
 
@@ -1570,7 +1570,7 @@ PyGObject_marshal_envp (gchar * const * envp, gint length)
   gint i;
 
   if (envp == NULL)
-    PyFrida_RETURN_NONE;
+    PyMiru_RETURN_NONE;
 
   result = PyDict_New ();
 
@@ -1727,7 +1727,7 @@ static PyObject *
 PyGObject_marshal_bytes (GBytes * bytes)
 {
   if (bytes == NULL)
-    PyFrida_RETURN_NONE;
+    PyMiru_RETURN_NONE;
 
   return PyGObject_marshal_bytes_non_nullable (bytes);
 }
@@ -1793,7 +1793,7 @@ PyGObject_marshal_variant (GVariant * variant)
       break;
   }
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -2071,11 +2071,11 @@ PyGObject_marshal_object (gpointer handle, GType type)
   const PyGObjectType * pytype;
 
   if (handle == NULL)
-    PyFrida_RETURN_NONE;
+    PyMiru_RETURN_NONE;
 
   pytype = g_hash_table_lookup (pygobject_type_spec_by_type, GSIZE_TO_POINTER (type));
   if (pytype == NULL)
-    pytype = PYFRIDA_TYPE (GObject);
+    pytype = PYMIRU_TYPE (GObject);
 
   if (G_IS_SOCKET_ADDRESS (handle))
     return PyGObject_marshal_socket_address (handle);
@@ -2142,7 +2142,7 @@ PyGObject_marshal_socket_address (GSocketAddress * address)
   }
 
   if (result == NULL)
-    result = PyGObject_new_take_handle (g_object_ref (address), PYFRIDA_TYPE (GObject));
+    result = PyGObject_new_take_handle (g_object_ref (address), PYMIRU_TYPE (GObject));
 
   return result;
 }
@@ -2163,7 +2163,7 @@ PyGObject_unmarshal_certificate (const gchar * str, GTlsCertificate ** certifica
 
 propagate_error:
   {
-    PyFrida_raise (g_error_new_literal (FRIDA_ERROR, FRIDA_ERROR_INVALID_ARGUMENT, error->message));
+    PyMiru_raise (g_error_new_literal (MIRU_ERROR, MIRU_ERROR_INVALID_ARGUMENT, error->message));
     g_error_free (error);
 
     return FALSE;
@@ -2179,7 +2179,7 @@ PyDeviceManager_init (PyDeviceManager * self, PyObject * args, PyObject * kw)
 
   g_atomic_int_inc (&toplevel_objects_alive);
 
-  PyGObject_take_handle (&self->parent, frida_device_manager_new (), PYFRIDA_TYPE (DeviceManager));
+  PyGObject_take_handle (&self->parent, miru_device_manager_new (), PYMIRU_TYPE (DeviceManager));
 
   return 0;
 }
@@ -2187,7 +2187,7 @@ PyDeviceManager_init (PyDeviceManager * self, PyObject * args, PyObject * kw)
 static void
 PyDeviceManager_dealloc (PyDeviceManager * self)
 {
-  FridaDeviceManager * handle;
+  MiruDeviceManager * handle;
 
   g_atomic_int_dec_and_test (&toplevel_objects_alive);
 
@@ -2195,8 +2195,8 @@ PyDeviceManager_dealloc (PyDeviceManager * self)
   if (handle != NULL)
   {
     Py_BEGIN_ALLOW_THREADS
-    frida_device_manager_close_sync (handle, NULL, NULL);
-    frida_unref (handle);
+    miru_device_manager_close_sync (handle, NULL, NULL);
+    miru_unref (handle);
     Py_END_ALLOW_THREADS
   }
 
@@ -2209,12 +2209,12 @@ PyDeviceManager_close (PyDeviceManager * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_device_manager_close_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_device_manager_close_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -2223,7 +2223,7 @@ PyDeviceManager_get_device_matching (PyDeviceManager * self, PyObject * args)
   PyObject * predicate;
   gint timeout;
   GError * error = NULL;
-  FridaDevice * result;
+  MiruDevice * result;
 
   if (!PyArg_ParseTuple (args, "Oi", &predicate, &timeout))
     return NULL;
@@ -2232,11 +2232,11 @@ PyDeviceManager_get_device_matching (PyDeviceManager * self, PyObject * args)
     goto not_callable;
 
   Py_BEGIN_ALLOW_THREADS
-  result = frida_device_manager_get_device_sync (PY_GOBJECT_HANDLE (self), (FridaDeviceManagerPredicate) PyDeviceManager_is_matching_device,
+  result = miru_device_manager_get_device_sync (PY_GOBJECT_HANDLE (self), (MiruDeviceManagerPredicate) PyDeviceManager_is_matching_device,
       predicate, timeout, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
   return PyDevice_new_take_handle (result);
 
@@ -2248,7 +2248,7 @@ not_callable:
 }
 
 static gboolean
-PyDeviceManager_is_matching_device (FridaDevice * device, PyObject * predicate)
+PyDeviceManager_is_matching_device (MiruDevice * device, PyObject * predicate)
 {
   gboolean is_matching = FALSE;
   PyGILState_STATE gstate;
@@ -2281,23 +2281,23 @@ static PyObject *
 PyDeviceManager_enumerate_devices (PyDeviceManager * self)
 {
   GError * error = NULL;
-  FridaDeviceList * result;
+  MiruDeviceList * result;
   gint result_length, i;
   PyObject * devices;
 
   Py_BEGIN_ALLOW_THREADS
-  result = frida_device_manager_enumerate_devices_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  result = miru_device_manager_enumerate_devices_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  result_length = frida_device_list_size (result);
+  result_length = miru_device_list_size (result);
   devices = PyList_New (result_length);
   for (i = 0; i != result_length; i++)
   {
-    PyList_SetItem (devices, i, PyDevice_new_take_handle (frida_device_list_get (result, i)));
+    PyList_SetItem (devices, i, PyDevice_new_take_handle (miru_device_list_get (result, i)));
   }
-  frida_unref (result);
+  miru_unref (result);
 
   return devices;
 }
@@ -2312,9 +2312,9 @@ PyDeviceManager_add_remote_device (PyDeviceManager * self, PyObject * args, PyOb
   char * origin = NULL;
   char * token = NULL;
   int keepalive_interval = -1;
-  FridaRemoteDeviceOptions * options;
+  MiruRemoteDeviceOptions * options;
   GError * error = NULL;
-  FridaDevice * handle;
+  MiruDevice * handle;
 
   if (!PyArg_ParseTupleAndKeywords (args, kw, "es|esesesi", keywords,
         "utf-8", &address,
@@ -2329,12 +2329,12 @@ PyDeviceManager_add_remote_device (PyDeviceManager * self, PyObject * args, PyOb
     goto beach;
 
   Py_BEGIN_ALLOW_THREADS
-  handle = frida_device_manager_add_remote_device_sync (PY_GOBJECT_HANDLE (self), address, options, g_cancellable_get_current (), &error);
+  handle = miru_device_manager_add_remote_device_sync (PY_GOBJECT_HANDLE (self), address, options, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   result = (error == NULL)
       ? PyDevice_new_take_handle (handle)
-      : PyFrida_raise (error);
+      : PyMiru_raise (error);
 
 beach:
   g_clear_object (&options);
@@ -2358,24 +2358,24 @@ PyDeviceManager_remove_remote_device (PyDeviceManager * self, PyObject * args, P
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_device_manager_remove_remote_device_sync (PY_GOBJECT_HANDLE (self), address, g_cancellable_get_current (), &error);
+  miru_device_manager_remove_remote_device_sync (PY_GOBJECT_HANDLE (self), address, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   PyMem_Free (address);
 
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
-static FridaRemoteDeviceOptions *
+static MiruRemoteDeviceOptions *
 PyDeviceManager_parse_remote_device_options (const gchar * certificate_value, const gchar * origin, const gchar * token,
     gint keepalive_interval)
 {
-  FridaRemoteDeviceOptions * options;
+  MiruRemoteDeviceOptions * options;
 
-  options = frida_remote_device_options_new ();
+  options = miru_remote_device_options_new ();
 
   if (certificate_value != NULL)
   {
@@ -2384,19 +2384,19 @@ PyDeviceManager_parse_remote_device_options (const gchar * certificate_value, co
     if (!PyGObject_unmarshal_certificate (certificate_value, &certificate))
       goto propagate_error;
 
-    frida_remote_device_options_set_certificate (options, certificate);
+    miru_remote_device_options_set_certificate (options, certificate);
 
     g_object_unref (certificate);
   }
 
   if (origin != NULL)
-    frida_remote_device_options_set_origin (options, origin);
+    miru_remote_device_options_set_origin (options, origin);
 
   if (token != NULL)
-    frida_remote_device_options_set_token (options, token);
+    miru_remote_device_options_set_token (options, token);
 
   if (keepalive_interval != -1)
-    frida_remote_device_options_set_keepalive_interval (options, keepalive_interval);
+    miru_remote_device_options_set_keepalive_interval (options, keepalive_interval);
 
   return options;
 
@@ -2410,9 +2410,9 @@ propagate_error:
 
 
 static PyObject *
-PyDevice_new_take_handle (FridaDevice * handle)
+PyDevice_new_take_handle (MiruDevice * handle)
 {
-  return PyGObject_new_take_handle (handle, PYFRIDA_TYPE (Device));
+  return PyGObject_new_take_handle (handle, PYMIRU_TYPE (Device));
 }
 
 static int
@@ -2431,13 +2431,13 @@ PyDevice_init (PyDevice * self, PyObject * args, PyObject * kw)
 }
 
 static void
-PyDevice_init_from_handle (PyDevice * self, FridaDevice * handle)
+PyDevice_init_from_handle (PyDevice * self, MiruDevice * handle)
 {
   GVariant * icon;
 
-  self->id = PyUnicode_FromString (frida_device_get_id (handle));
-  self->name = PyUnicode_FromString (frida_device_get_name (handle));
-  icon = frida_device_get_icon (handle);
+  self->id = PyUnicode_FromString (miru_device_get_id (handle));
+  self->name = PyUnicode_FromString (miru_device_get_name (handle));
+  icon = miru_device_get_icon (handle);
   if (icon != NULL)
   {
     self->icon = PyGObject_marshal_variant (icon);
@@ -2447,8 +2447,8 @@ PyDevice_init_from_handle (PyDevice * self, FridaDevice * handle)
     self->icon = Py_None;
     Py_IncRef (Py_None);
   }
-  self->type = PyGObject_marshal_enum (frida_device_get_dtype (handle), FRIDA_TYPE_DEVICE_TYPE);
-  self->bus = PyBus_new_take_handle (g_object_ref (frida_device_get_bus (handle)));
+  self->type = PyGObject_marshal_enum (miru_device_get_dtype (handle), MIRU_TYPE_DEVICE_TYPE);
+  self->bus = PyBus_new_take_handle (g_object_ref (miru_device_get_bus (handle)));
 }
 
 static void
@@ -2490,7 +2490,7 @@ PyDevice_is_lost (PyDevice * self)
   gboolean is_lost;
 
   Py_BEGIN_ALLOW_THREADS
-  is_lost = frida_device_is_lost (PY_GOBJECT_HANDLE (self));
+  is_lost = miru_device_is_lost (PY_GOBJECT_HANDLE (self));
   Py_END_ALLOW_THREADS
 
   return PyBool_FromLong (is_lost);
@@ -2504,10 +2504,10 @@ PyDevice_query_system_parameters (PyDevice * self)
   PyObject * parameters;
 
   Py_BEGIN_ALLOW_THREADS
-  result = frida_device_query_system_parameters_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  result = miru_device_query_system_parameters_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
   parameters = PyGObject_marshal_parameters_dict (result);
   g_hash_table_unref (result);
@@ -2520,38 +2520,38 @@ PyDevice_get_frontmost_application (PyDevice * self, PyObject * args, PyObject *
 {
   static char * keywords[] = { "scope", NULL };
   const char * scope_value = NULL;
-  FridaFrontmostQueryOptions * options;
+  MiruFrontmostQueryOptions * options;
   GError * error = NULL;
-  FridaApplication * result;
+  MiruApplication * result;
 
   if (!PyArg_ParseTupleAndKeywords (args, kw, "|s", keywords, &scope_value))
     return NULL;
 
-  options = frida_frontmost_query_options_new ();
+  options = miru_frontmost_query_options_new ();
 
   if (scope_value != NULL)
   {
-    FridaScope scope;
+    MiruScope scope;
 
-    if (!PyGObject_unmarshal_enum (scope_value, FRIDA_TYPE_SCOPE, &scope))
+    if (!PyGObject_unmarshal_enum (scope_value, MIRU_TYPE_SCOPE, &scope))
       goto invalid_argument;
 
-    frida_frontmost_query_options_set_scope (options, scope);
+    miru_frontmost_query_options_set_scope (options, scope);
   }
 
   Py_BEGIN_ALLOW_THREADS
-  result = frida_device_get_frontmost_application_sync (PY_GOBJECT_HANDLE (self), options, g_cancellable_get_current (), &error);
+  result = miru_device_get_frontmost_application_sync (PY_GOBJECT_HANDLE (self), options, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   g_object_unref (options);
 
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
   if (result != NULL)
     return PyApplication_new_take_handle (result);
   else
-    PyFrida_RETURN_NONE;
+    PyMiru_RETURN_NONE;
 
 invalid_argument:
   {
@@ -2567,9 +2567,9 @@ PyDevice_enumerate_applications (PyDevice * self, PyObject * args, PyObject * kw
   static char * keywords[] = { "identifiers", "scope", NULL };
   PyObject * identifiers = NULL;
   const char * scope = NULL;
-  FridaApplicationQueryOptions * options;
+  MiruApplicationQueryOptions * options;
   GError * error = NULL;
-  FridaApplicationList * result;
+  MiruApplicationList * result;
   gint result_length, i;
   PyObject * applications;
 
@@ -2581,31 +2581,31 @@ PyDevice_enumerate_applications (PyDevice * self, PyObject * args, PyObject * kw
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  result = frida_device_enumerate_applications_sync (PY_GOBJECT_HANDLE (self), options, g_cancellable_get_current (), &error);
+  result = miru_device_enumerate_applications_sync (PY_GOBJECT_HANDLE (self), options, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   g_object_unref (options);
 
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  result_length = frida_application_list_size (result);
+  result_length = miru_application_list_size (result);
   applications = PyList_New (result_length);
   for (i = 0; i != result_length; i++)
   {
-    PyList_SetItem (applications, i, PyApplication_new_take_handle (frida_application_list_get (result, i)));
+    PyList_SetItem (applications, i, PyApplication_new_take_handle (miru_application_list_get (result, i)));
   }
   g_object_unref (result);
 
   return applications;
 }
 
-static FridaApplicationQueryOptions *
+static MiruApplicationQueryOptions *
 PyDevice_parse_application_query_options (PyObject * identifiers_value, const gchar * scope_value)
 {
-  FridaApplicationQueryOptions * options;
+  MiruApplicationQueryOptions * options;
 
-  options = frida_application_query_options_new ();
+  options = miru_application_query_options_new ();
 
   if (identifiers_value != NULL)
   {
@@ -2628,7 +2628,7 @@ PyDevice_parse_application_query_options (PyObject * identifiers_value, const gc
       if (identifier == NULL)
         goto propagate_error;
 
-      frida_application_query_options_select_identifier (options, identifier);
+      miru_application_query_options_select_identifier (options, identifier);
 
       g_free (identifier);
     }
@@ -2636,12 +2636,12 @@ PyDevice_parse_application_query_options (PyObject * identifiers_value, const gc
 
   if (scope_value != NULL)
   {
-    FridaScope scope;
+    MiruScope scope;
 
-    if (!PyGObject_unmarshal_enum (scope_value, FRIDA_TYPE_SCOPE, &scope))
+    if (!PyGObject_unmarshal_enum (scope_value, MIRU_TYPE_SCOPE, &scope))
       goto propagate_error;
 
-    frida_application_query_options_set_scope (options, scope);
+    miru_application_query_options_set_scope (options, scope);
   }
 
   return options;
@@ -2660,9 +2660,9 @@ PyDevice_enumerate_processes (PyDevice * self, PyObject * args, PyObject * kw)
   static char * keywords[] = { "pids", "scope", NULL };
   PyObject * pids = NULL;
   const char * scope = NULL;
-  FridaProcessQueryOptions * options;
+  MiruProcessQueryOptions * options;
   GError * error = NULL;
-  FridaProcessList * result;
+  MiruProcessList * result;
   gint result_length, i;
   PyObject * processes;
 
@@ -2674,31 +2674,31 @@ PyDevice_enumerate_processes (PyDevice * self, PyObject * args, PyObject * kw)
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  result = frida_device_enumerate_processes_sync (PY_GOBJECT_HANDLE (self), options, g_cancellable_get_current (), &error);
+  result = miru_device_enumerate_processes_sync (PY_GOBJECT_HANDLE (self), options, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   g_object_unref (options);
 
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  result_length = frida_process_list_size (result);
+  result_length = miru_process_list_size (result);
   processes = PyList_New (result_length);
   for (i = 0; i != result_length; i++)
   {
-    PyList_SetItem (processes, i, PyProcess_new_take_handle (frida_process_list_get (result, i)));
+    PyList_SetItem (processes, i, PyProcess_new_take_handle (miru_process_list_get (result, i)));
   }
   g_object_unref (result);
 
   return processes;
 }
 
-static FridaProcessQueryOptions *
+static MiruProcessQueryOptions *
 PyDevice_parse_process_query_options (PyObject * pids_value, const gchar * scope_value)
 {
-  FridaProcessQueryOptions * options;
+  MiruProcessQueryOptions * options;
 
-  options = frida_process_query_options_new ();
+  options = miru_process_query_options_new ();
 
   if (pids_value != NULL)
   {
@@ -2721,18 +2721,18 @@ PyDevice_parse_process_query_options (PyObject * pids_value, const gchar * scope
       if (pid == -1)
         goto propagate_error;
 
-      frida_process_query_options_select_pid (options, pid);
+      miru_process_query_options_select_pid (options, pid);
     }
   }
 
   if (scope_value != NULL)
   {
-    FridaScope scope;
+    MiruScope scope;
 
-    if (!PyGObject_unmarshal_enum (scope_value, FRIDA_TYPE_SCOPE, &scope))
+    if (!PyGObject_unmarshal_enum (scope_value, MIRU_TYPE_SCOPE, &scope))
       goto propagate_error;
 
-    frida_process_query_options_set_scope (options, scope);
+    miru_process_query_options_set_scope (options, scope);
   }
 
   return options;
@@ -2751,12 +2751,12 @@ PyDevice_enable_spawn_gating (PyDevice * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_device_enable_spawn_gating_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_device_enable_spawn_gating_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -2765,33 +2765,33 @@ PyDevice_disable_spawn_gating (PyDevice * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_device_disable_spawn_gating_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_device_disable_spawn_gating_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
 PyDevice_enumerate_pending_spawn (PyDevice * self)
 {
   GError * error = NULL;
-  FridaSpawnList * result;
+  MiruSpawnList * result;
   gint result_length, i;
   PyObject * spawn;
 
   Py_BEGIN_ALLOW_THREADS
-  result = frida_device_enumerate_pending_spawn_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  result = miru_device_enumerate_pending_spawn_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  result_length = frida_spawn_list_size (result);
+  result_length = miru_spawn_list_size (result);
   spawn = PyList_New (result_length);
   for (i = 0; i != result_length; i++)
   {
-    PyList_SetItem (spawn, i, PySpawn_new_take_handle (frida_spawn_list_get (result, i)));
+    PyList_SetItem (spawn, i, PySpawn_new_take_handle (miru_spawn_list_get (result, i)));
   }
   g_object_unref (result);
 
@@ -2802,21 +2802,21 @@ static PyObject *
 PyDevice_enumerate_pending_children (PyDevice * self)
 {
   GError * error = NULL;
-  FridaChildList * result;
+  MiruChildList * result;
   gint result_length, i;
   PyObject * children;
 
   Py_BEGIN_ALLOW_THREADS
-  result = frida_device_enumerate_pending_children_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  result = miru_device_enumerate_pending_children_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  result_length = frida_child_list_size (result);
+  result_length = miru_child_list_size (result);
   children = PyList_New (result_length);
   for (i = 0; i != result_length; i++)
   {
-    PyList_SetItem (children, i, PyChild_new_take_handle (frida_child_list_get (result, i)));
+    PyList_SetItem (children, i, PyChild_new_take_handle (miru_child_list_get (result, i)));
   }
   g_object_unref (result);
 
@@ -2834,7 +2834,7 @@ PyDevice_spawn (PyDevice * self, PyObject * args, PyObject * kw)
   const char * cwd = NULL;
   const char * stdio_value = NULL;
   PyObject * aux_value = Py_None;
-  FridaSpawnOptions * options;
+  MiruSpawnOptions * options;
   GError * error = NULL;
   guint pid;
 
@@ -2848,7 +2848,7 @@ PyDevice_spawn (PyDevice * self, PyObject * args, PyObject * kw)
       &aux_value))
     return NULL;
 
-  options = frida_spawn_options_new ();
+  options = miru_spawn_options_new ();
 
   if (argv_value != Py_None)
   {
@@ -2858,7 +2858,7 @@ PyDevice_spawn (PyDevice * self, PyObject * args, PyObject * kw)
     if (!PyGObject_unmarshal_strv (argv_value, &argv, &argv_length))
       goto invalid_argument;
 
-    frida_spawn_options_set_argv (options, argv, argv_length);
+    miru_spawn_options_set_argv (options, argv, argv_length);
 
     g_strfreev (argv);
   }
@@ -2871,7 +2871,7 @@ PyDevice_spawn (PyDevice * self, PyObject * args, PyObject * kw)
     if (!PyGObject_unmarshal_envp (envp_value, &envp, &envp_length))
       goto invalid_argument;
 
-    frida_spawn_options_set_envp (options, envp, envp_length);
+    miru_spawn_options_set_envp (options, envp, envp_length);
 
     g_strfreev (envp);
   }
@@ -2884,22 +2884,22 @@ PyDevice_spawn (PyDevice * self, PyObject * args, PyObject * kw)
     if (!PyGObject_unmarshal_envp (env_value, &env, &env_length))
       goto invalid_argument;
 
-    frida_spawn_options_set_env (options, env, env_length);
+    miru_spawn_options_set_env (options, env, env_length);
 
     g_strfreev (env);
   }
 
   if (cwd != NULL)
-    frida_spawn_options_set_cwd (options, cwd);
+    miru_spawn_options_set_cwd (options, cwd);
 
   if (stdio_value != NULL)
   {
-    FridaStdio stdio;
+    MiruStdio stdio;
 
-    if (!PyGObject_unmarshal_enum (stdio_value, FRIDA_TYPE_STDIO, &stdio))
+    if (!PyGObject_unmarshal_enum (stdio_value, MIRU_TYPE_STDIO, &stdio))
       goto invalid_argument;
 
-    frida_spawn_options_set_stdio (options, stdio);
+    miru_spawn_options_set_stdio (options, stdio);
   }
 
   if (aux_value != Py_None)
@@ -2908,7 +2908,7 @@ PyDevice_spawn (PyDevice * self, PyObject * args, PyObject * kw)
     Py_ssize_t pos;
     PyObject * key, * value;
 
-    aux = frida_spawn_options_get_aux (options);
+    aux = miru_spawn_options_get_aux (options);
 
     if (!PyDict_Check (aux_value))
       goto invalid_aux_dict;
@@ -2933,13 +2933,13 @@ PyDevice_spawn (PyDevice * self, PyObject * args, PyObject * kw)
   }
 
   Py_BEGIN_ALLOW_THREADS
-  pid = frida_device_spawn_sync (PY_GOBJECT_HANDLE (self), program, options, g_cancellable_get_current (), &error);
+  pid = miru_device_spawn_sync (PY_GOBJECT_HANDLE (self), program, options, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   g_object_unref (options);
 
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
   return PyLong_FromUnsignedLong (pid);
 
@@ -2976,15 +2976,15 @@ PyDevice_input (PyDevice * self, PyObject * args)
   data = g_bytes_new (data_buffer, data_size);
 
   Py_BEGIN_ALLOW_THREADS
-  frida_device_input_sync (PY_GOBJECT_HANDLE (self), (guint) pid, data, g_cancellable_get_current (), &error);
+  miru_device_input_sync (PY_GOBJECT_HANDLE (self), (guint) pid, data, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   g_bytes_unref (data);
 
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -2997,12 +2997,12 @@ PyDevice_resume (PyDevice * self, PyObject * args)
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_device_resume_sync (PY_GOBJECT_HANDLE (self), (guint) pid, g_cancellable_get_current (), &error);
+  miru_device_resume_sync (PY_GOBJECT_HANDLE (self), (guint) pid, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -3015,12 +3015,12 @@ PyDevice_kill (PyDevice * self, PyObject * args)
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_device_kill_sync (PY_GOBJECT_HANDLE (self), (guint) pid, g_cancellable_get_current (), &error);
+  miru_device_kill_sync (PY_GOBJECT_HANDLE (self), (guint) pid, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -3031,9 +3031,9 @@ PyDevice_attach (PyDevice * self, PyObject * args, PyObject * kw)
   long pid;
   char * realm_value = NULL;
   unsigned int persist_timeout = 0;
-  FridaSessionOptions * options = NULL;
+  MiruSessionOptions * options = NULL;
   GError * error = NULL;
-  FridaSession * handle;
+  MiruSession * handle;
 
   if (!PyArg_ParseTupleAndKeywords (args, kw, "l|esI", keywords,
         &pid,
@@ -3046,12 +3046,12 @@ PyDevice_attach (PyDevice * self, PyObject * args, PyObject * kw)
     goto beach;
 
   Py_BEGIN_ALLOW_THREADS
-  handle = frida_device_attach_sync (PY_GOBJECT_HANDLE (self), (guint) pid, options, g_cancellable_get_current (), &error);
+  handle = miru_device_attach_sync (PY_GOBJECT_HANDLE (self), (guint) pid, options, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   result = (error == NULL)
       ? PySession_new_take_handle (handle)
-      : PyFrida_raise (error);
+      : PyMiru_raise (error);
 
 beach:
   g_clear_object (&options);
@@ -3061,25 +3061,25 @@ beach:
   return result;
 }
 
-static FridaSessionOptions *
+static MiruSessionOptions *
 PyDevice_parse_session_options (const gchar * realm_value,
                                 guint persist_timeout)
 {
-  FridaSessionOptions * options;
+  MiruSessionOptions * options;
 
-  options = frida_session_options_new ();
+  options = miru_session_options_new ();
 
   if (realm_value != NULL)
   {
-    FridaRealm realm;
+    MiruRealm realm;
 
-    if (!PyGObject_unmarshal_enum (realm_value, FRIDA_TYPE_REALM, &realm))
+    if (!PyGObject_unmarshal_enum (realm_value, MIRU_TYPE_REALM, &realm))
       goto propagate_error;
 
-    frida_session_options_set_realm (options, realm);
+    miru_session_options_set_realm (options, realm);
   }
 
-  frida_session_options_set_persist_timeout (options, persist_timeout);
+  miru_session_options_set_persist_timeout (options, persist_timeout);
 
   return options;
 
@@ -3103,10 +3103,10 @@ PyDevice_inject_library_file (PyDevice * self, PyObject * args)
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  id = frida_device_inject_library_file_sync (PY_GOBJECT_HANDLE (self), (guint) pid, path, entrypoint, data, g_cancellable_get_current (), &error);
+  id = miru_device_inject_library_file_sync (PY_GOBJECT_HANDLE (self), (guint) pid, path, entrypoint, data, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
   return PyLong_FromUnsignedLong (id);
 }
@@ -3128,13 +3128,13 @@ PyDevice_inject_library_blob (PyDevice * self, PyObject * args)
   blob = g_bytes_new (blob_buffer, blob_size);
 
   Py_BEGIN_ALLOW_THREADS
-  id = frida_device_inject_library_blob_sync (PY_GOBJECT_HANDLE (self), (guint) pid, blob, entrypoint, data, g_cancellable_get_current (), &error);
+  id = miru_device_inject_library_blob_sync (PY_GOBJECT_HANDLE (self), (guint) pid, blob, entrypoint, data, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   g_bytes_unref (blob);
 
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
   return PyLong_FromUnsignedLong (id);
 }
@@ -3150,10 +3150,10 @@ PyDevice_open_channel (PyDevice * self, PyObject * args)
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  stream = frida_device_open_channel_sync (PY_GOBJECT_HANDLE (self), address, g_cancellable_get_current (), &error);
+  stream = miru_device_open_channel_sync (PY_GOBJECT_HANDLE (self), address, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
   return PyIOStream_new_take_handle (stream);
 }
@@ -3163,16 +3163,16 @@ PyDevice_open_service (PyDevice * self, PyObject * args)
 {
   const char * address;
   GError * error = NULL;
-  FridaService * service;
+  MiruService * service;
 
   if (!PyArg_ParseTuple (args, "s", &address))
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  service = frida_device_open_service_sync (PY_GOBJECT_HANDLE (self), address, g_cancellable_get_current (), &error);
+  service = miru_device_open_service_sync (PY_GOBJECT_HANDLE (self), address, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
   return PyService_new_take_handle (service);
 }
@@ -3183,19 +3183,19 @@ PyDevice_unpair (PyDevice * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_device_unpair_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_device_unpair_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 
 static PyObject *
-PyApplication_new_take_handle (FridaApplication * handle)
+PyApplication_new_take_handle (MiruApplication * handle)
 {
-  return PyGObject_new_take_handle (handle, PYFRIDA_TYPE (Application));
+  return PyGObject_new_take_handle (handle, PYMIRU_TYPE (Application));
 }
 
 static int
@@ -3213,12 +3213,12 @@ PyApplication_init (PyApplication * self, PyObject * args, PyObject * kw)
 }
 
 static void
-PyApplication_init_from_handle (PyApplication * self, FridaApplication * handle)
+PyApplication_init_from_handle (PyApplication * self, MiruApplication * handle)
 {
-  self->identifier = PyUnicode_FromString (frida_application_get_identifier (handle));
-  self->name = PyUnicode_FromString (frida_application_get_name (handle));
-  self->pid = frida_application_get_pid (handle);
-  self->parameters = PyApplication_marshal_parameters_dict (frida_application_get_parameters (handle));
+  self->identifier = PyUnicode_FromString (miru_application_get_identifier (handle));
+  self->name = PyUnicode_FromString (miru_application_get_name (handle));
+  self->pid = miru_application_get_pid (handle);
+  self->parameters = PyApplication_marshal_parameters_dict (miru_application_get_parameters (handle));
 }
 
 static void
@@ -3235,7 +3235,7 @@ static PyObject *
 PyApplication_repr (PyApplication * self)
 {
   PyObject * result;
-  FridaApplication * handle;
+  MiruApplication * handle;
   GString * repr;
   gchar * str;
 
@@ -3244,13 +3244,13 @@ PyApplication_repr (PyApplication * self)
   repr = g_string_new ("Application(");
 
   g_string_append_printf (repr, "identifier=\"%s\", name=\"%s\"",
-      frida_application_get_identifier (handle),
-      frida_application_get_name (handle));
+      miru_application_get_identifier (handle),
+      miru_application_get_name (handle));
 
   if (self->pid != 0)
     g_string_append_printf (repr, ", pid=%u", self->pid);
 
-  str = PyFrida_repr (self->parameters);
+  str = PyMiru_repr (self->parameters);
   g_string_append_printf (repr, ", parameters=%s", str);
   g_free (str);
 
@@ -3294,9 +3294,9 @@ PyApplication_marshal_parameters_dict (GHashTable * dict)
 
 
 static PyObject *
-PyProcess_new_take_handle (FridaProcess * handle)
+PyProcess_new_take_handle (MiruProcess * handle)
 {
-  return PyGObject_new_take_handle (handle, PYFRIDA_TYPE (Process));
+  return PyGObject_new_take_handle (handle, PYMIRU_TYPE (Process));
 }
 
 static int
@@ -3313,11 +3313,11 @@ PyProcess_init (PyProcess * self, PyObject * args, PyObject * kw)
 }
 
 static void
-PyProcess_init_from_handle (PyProcess * self, FridaProcess * handle)
+PyProcess_init_from_handle (PyProcess * self, MiruProcess * handle)
 {
-  self->pid = frida_process_get_pid (handle);
-  self->name = PyUnicode_FromString (frida_process_get_name (handle));
-  self->parameters = PyProcess_marshal_parameters_dict (frida_process_get_parameters (handle));
+  self->pid = miru_process_get_pid (handle);
+  self->name = PyUnicode_FromString (miru_process_get_name (handle));
+  self->parameters = PyProcess_marshal_parameters_dict (miru_process_get_parameters (handle));
 }
 
 static void
@@ -3333,7 +3333,7 @@ static PyObject *
 PyProcess_repr (PyProcess * self)
 {
   PyObject * result;
-  FridaProcess * handle;
+  MiruProcess * handle;
   GString * repr;
   gchar * str;
 
@@ -3343,9 +3343,9 @@ PyProcess_repr (PyProcess * self)
 
   g_string_append_printf (repr, "pid=%u, name=\"%s\"",
       self->pid,
-      frida_process_get_name (handle));
+      miru_process_get_name (handle));
 
-  str = PyFrida_repr (self->parameters);
+  str = PyMiru_repr (self->parameters);
   g_string_append_printf (repr, ", parameters=%s", str);
   g_free (str);
 
@@ -3389,9 +3389,9 @@ PyProcess_marshal_parameters_dict (GHashTable * dict)
 
 
 static PyObject *
-PySpawn_new_take_handle (FridaSpawn * handle)
+PySpawn_new_take_handle (MiruSpawn * handle)
 {
-  return PyGObject_new_take_handle (handle, PYFRIDA_TYPE (Spawn));
+  return PyGObject_new_take_handle (handle, PYMIRU_TYPE (Spawn));
 }
 
 static int
@@ -3407,10 +3407,10 @@ PySpawn_init (PySpawn * self, PyObject * args, PyObject * kw)
 }
 
 static void
-PySpawn_init_from_handle (PySpawn * self, FridaSpawn * handle)
+PySpawn_init_from_handle (PySpawn * self, MiruSpawn * handle)
 {
-  self->pid = frida_spawn_get_pid (handle);
-  self->identifier = PyGObject_marshal_string (frida_spawn_get_identifier (handle));
+  self->pid = miru_spawn_get_pid (handle);
+  self->identifier = PyGObject_marshal_string (miru_spawn_get_identifier (handle));
 }
 
 static void
@@ -3449,9 +3449,9 @@ PySpawn_repr (PySpawn * self)
 
 
 static PyObject *
-PyChild_new_take_handle (FridaChild * handle)
+PyChild_new_take_handle (MiruChild * handle)
 {
-  return PyGObject_new_take_handle (handle, PYFRIDA_TYPE (Child));
+  return PyGObject_new_take_handle (handle, PYMIRU_TYPE (Child));
 }
 
 static int
@@ -3472,24 +3472,24 @@ PyChild_init (PyChild * self, PyObject * args, PyObject * kw)
 }
 
 static void
-PyChild_init_from_handle (PyChild * self, FridaChild * handle)
+PyChild_init_from_handle (PyChild * self, MiruChild * handle)
 {
   gchar * const * argv, * const * envp;
   gint argv_length, envp_length;
 
-  self->pid = frida_child_get_pid (handle);
-  self->parent_pid = frida_child_get_parent_pid (handle);
+  self->pid = miru_child_get_pid (handle);
+  self->parent_pid = miru_child_get_parent_pid (handle);
 
-  self->origin = PyGObject_marshal_enum (frida_child_get_origin (handle), FRIDA_TYPE_CHILD_ORIGIN);
+  self->origin = PyGObject_marshal_enum (miru_child_get_origin (handle), MIRU_TYPE_CHILD_ORIGIN);
 
-  self->identifier = PyGObject_marshal_string (frida_child_get_identifier (handle));
+  self->identifier = PyGObject_marshal_string (miru_child_get_identifier (handle));
 
-  self->path = PyGObject_marshal_string (frida_child_get_path (handle));
+  self->path = PyGObject_marshal_string (miru_child_get_path (handle));
 
-  argv = frida_child_get_argv (handle, &argv_length);
+  argv = miru_child_get_argv (handle, &argv_length);
   self->argv = PyGObject_marshal_strv (argv, argv_length);
 
-  envp = frida_child_get_envp (handle, &envp_length);
+  envp = miru_child_get_envp (handle, &envp_length);
   self->envp = PyGObject_marshal_envp (envp, envp_length);
 }
 
@@ -3509,9 +3509,9 @@ static PyObject *
 PyChild_repr (PyChild * self)
 {
   PyObject * result;
-  FridaChild * handle;
+  MiruChild * handle;
   GString * repr;
-  FridaChildOrigin origin;
+  MiruChildOrigin origin;
   GEnumClass * origin_class;
   GEnumValue * origin_value;
 
@@ -3521,8 +3521,8 @@ PyChild_repr (PyChild * self)
 
   g_string_append_printf (repr, "pid=%u, parent_pid=%u", self->pid, self->parent_pid);
 
-  origin = frida_child_get_origin (handle);
-  origin_class = g_type_class_ref (FRIDA_TYPE_CHILD_ORIGIN);
+  origin = miru_child_get_origin (handle);
+  origin_class = g_type_class_ref (MIRU_TYPE_CHILD_ORIGIN);
   origin_value = g_enum_get_value (origin_class, origin);
   g_string_append_printf (repr, ", origin=%s", origin_value->value_nick);
   g_type_class_unref (origin_class);
@@ -3531,20 +3531,20 @@ PyChild_repr (PyChild * self)
   {
     gchar * identifier;
 
-    identifier = PyFrida_repr (self->identifier);
+    identifier = PyMiru_repr (self->identifier);
 
     g_string_append_printf (repr, ", identifier=%s", identifier);
 
     g_free (identifier);
   }
 
-  if (origin != FRIDA_CHILD_ORIGIN_FORK)
+  if (origin != MIRU_CHILD_ORIGIN_FORK)
   {
     gchar * path, * argv, * envp;
 
-    path = PyFrida_repr (self->path);
-    argv = PyFrida_repr (self->argv);
-    envp = PyFrida_repr (self->envp);
+    path = PyMiru_repr (self->path);
+    argv = PyMiru_repr (self->argv);
+    envp = PyMiru_repr (self->envp);
 
     g_string_append_printf (repr, ", path=%s, argv=%s, envp=%s", path, argv, envp);
 
@@ -3579,13 +3579,13 @@ PyCrash_init (PyCrash * self, PyObject * args, PyObject * kw)
 }
 
 static void
-PyCrash_init_from_handle (PyCrash * self, FridaCrash * handle)
+PyCrash_init_from_handle (PyCrash * self, MiruCrash * handle)
 {
-  self->pid = frida_crash_get_pid (handle);
-  self->process_name = PyGObject_marshal_string (frida_crash_get_process_name (handle));
-  self->summary = PyGObject_marshal_string (frida_crash_get_summary (handle));
-  self->report = PyGObject_marshal_string (frida_crash_get_report (handle));
-  self->parameters = PyGObject_marshal_parameters_dict (frida_crash_get_parameters (handle));
+  self->pid = miru_crash_get_pid (handle);
+  self->process_name = PyGObject_marshal_string (miru_crash_get_process_name (handle));
+  self->summary = PyGObject_marshal_string (miru_crash_get_summary (handle));
+  self->report = PyGObject_marshal_string (miru_crash_get_report (handle));
+  self->parameters = PyGObject_marshal_parameters_dict (miru_crash_get_parameters (handle));
 }
 
 static void
@@ -3603,7 +3603,7 @@ static PyObject *
 PyCrash_repr (PyCrash * self)
 {
   PyObject * result;
-  FridaCrash * handle;
+  MiruCrash * handle;
   GString * repr;
   gchar * str;
 
@@ -3613,11 +3613,11 @@ PyCrash_repr (PyCrash * self)
 
   g_string_append_printf (repr, "pid=%u, process_name=\"%s\", summary=\"%s\", report=<%u bytes>",
       self->pid,
-      frida_crash_get_process_name (handle),
-      frida_crash_get_summary (handle),
-      (guint) strlen (frida_crash_get_report (handle)));
+      miru_crash_get_process_name (handle),
+      miru_crash_get_summary (handle),
+      (guint) strlen (miru_crash_get_report (handle)));
 
-  str = PyFrida_repr (self->parameters);
+  str = PyMiru_repr (self->parameters);
   g_string_append_printf (repr, ", parameters=%s", str);
   g_free (str);
 
@@ -3632,9 +3632,9 @@ PyCrash_repr (PyCrash * self)
 
 
 static PyObject *
-PyBus_new_take_handle (FridaBus * handle)
+PyBus_new_take_handle (MiruBus * handle)
 {
-  return PyGObject_new_take_handle (handle, PYFRIDA_TYPE (Bus));
+  return PyGObject_new_take_handle (handle, PYMIRU_TYPE (Bus));
 }
 
 static PyObject *
@@ -3643,12 +3643,12 @@ PyBus_attach (PySession * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_bus_attach_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_bus_attach_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -3666,20 +3666,20 @@ PyBus_post (PyScript * self, PyObject * args, PyObject * kw)
   data = (data_buffer != NULL) ? g_bytes_new (data_buffer, data_size) : NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_bus_post (PY_GOBJECT_HANDLE (self), message, data);
+  miru_bus_post (PY_GOBJECT_HANDLE (self), message, data);
   Py_END_ALLOW_THREADS
 
   g_bytes_unref (data);
   PyMem_Free (message);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 
 static PyObject *
-PyService_new_take_handle (FridaService * handle)
+PyService_new_take_handle (MiruService * handle)
 {
-  return PyGObject_new_take_handle (handle, PYFRIDA_TYPE (Service));
+  return PyGObject_new_take_handle (handle, PYMIRU_TYPE (Service));
 }
 
 static PyObject *
@@ -3688,12 +3688,12 @@ PyService_activate (PyService * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_service_activate_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_service_activate_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -3702,12 +3702,12 @@ PyService_cancel (PyService * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_service_cancel_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_service_cancel_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -3724,13 +3724,13 @@ PyService_request (PyService * self, PyObject * args)
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  raw_result = frida_service_request_sync (PY_GOBJECT_HANDLE (self), raw_params, g_cancellable_get_current (), &error);
+  raw_result = miru_service_request_sync (PY_GOBJECT_HANDLE (self), raw_params, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   g_variant_unref (raw_params);
 
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
   result = PyGObject_marshal_variant (raw_result);
   g_variant_unref (raw_result);
@@ -3740,9 +3740,9 @@ PyService_request (PyService * self, PyObject * args)
 
 
 static PyObject *
-PySession_new_take_handle (FridaSession * handle)
+PySession_new_take_handle (MiruSession * handle)
 {
-  return PyGObject_new_take_handle (handle, PYFRIDA_TYPE (Session));
+  return PyGObject_new_take_handle (handle, PYMIRU_TYPE (Session));
 }
 
 static int
@@ -3757,9 +3757,9 @@ PySession_init (PySession * self, PyObject * args, PyObject * kw)
 }
 
 static void
-PySession_init_from_handle (PySession * self, FridaSession * handle)
+PySession_init_from_handle (PySession * self, MiruSession * handle)
 {
-  self->pid = frida_session_get_pid (handle);
+  self->pid = miru_session_get_pid (handle);
 }
 
 static PyObject *
@@ -3774,7 +3774,7 @@ PySession_is_detached (PySession * self)
   gboolean is_detached;
 
   Py_BEGIN_ALLOW_THREADS
-  is_detached = frida_session_is_detached (PY_GOBJECT_HANDLE (self));
+  is_detached = miru_session_is_detached (PY_GOBJECT_HANDLE (self));
   Py_END_ALLOW_THREADS
 
   return PyBool_FromLong (is_detached);
@@ -3786,12 +3786,12 @@ PySession_detach (PySession * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_session_detach_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_session_detach_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -3800,12 +3800,12 @@ PySession_resume (PySession * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_session_resume_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_session_resume_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -3814,12 +3814,12 @@ PySession_enable_child_gating (PySession * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_session_enable_child_gating_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_session_enable_child_gating_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -3828,12 +3828,12 @@ PySession_disable_child_gating (PySession * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_session_disable_child_gating_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_session_disable_child_gating_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -3846,9 +3846,9 @@ PySession_create_script (PySession * self, PyObject * args, PyObject * kw)
   gconstpointer snapshot_data = NULL;
   Py_ssize_t snapshot_size = 0;
   const char * runtime_value = NULL;
-  FridaScriptOptions * options;
+  MiruScriptOptions * options;
   GError * error = NULL;
-  FridaScript * handle;
+  MiruScript * handle;
 
   if (!PyArg_ParseTupleAndKeywords (args, kw, "es|esy#z", keywords, "utf-8", &source, "utf-8", &name, &snapshot_data, &snapshot_size, &runtime_value))
     return NULL;
@@ -3858,12 +3858,12 @@ PySession_create_script (PySession * self, PyObject * args, PyObject * kw)
     goto beach;
 
   Py_BEGIN_ALLOW_THREADS
-  handle = frida_session_create_script_sync (PY_GOBJECT_HANDLE (self), source, options, g_cancellable_get_current (), &error);
+  handle = miru_session_create_script_sync (PY_GOBJECT_HANDLE (self), source, options, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   result = (error == NULL)
       ? PyScript_new_take_handle (handle)
-      : PyFrida_raise (error);
+      : PyMiru_raise (error);
 
 beach:
   g_clear_object (&options);
@@ -3886,9 +3886,9 @@ PySession_create_script_from_bytes (PySession * self, PyObject * args, PyObject 
   Py_ssize_t snapshot_size = 0;
   const char * runtime_value = NULL;
   GBytes * bytes;
-  FridaScriptOptions * options;
+  MiruScriptOptions * options;
   GError * error = NULL;
-  FridaScript * handle;
+  MiruScript * handle;
 
   if (!PyArg_ParseTupleAndKeywords (args, kw, "y#|esy#z", keywords, &data, &size, "utf-8", &name, &snapshot_data, &snapshot_size, &runtime_value))
     return NULL;
@@ -3900,12 +3900,12 @@ PySession_create_script_from_bytes (PySession * self, PyObject * args, PyObject 
     goto beach;
 
   Py_BEGIN_ALLOW_THREADS
-  handle = frida_session_create_script_from_bytes_sync (PY_GOBJECT_HANDLE (self), bytes, options, g_cancellable_get_current (), &error);
+  handle = miru_session_create_script_from_bytes_sync (PY_GOBJECT_HANDLE (self), bytes, options, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   result = (error == NULL)
       ? PyScript_new_take_handle (handle)
-      : PyFrida_raise (error);
+      : PyMiru_raise (error);
 
 beach:
   g_clear_object (&options);
@@ -3924,7 +3924,7 @@ PySession_compile_script (PySession * self, PyObject * args, PyObject * kw)
   char * source;
   char * name = NULL;
   const char * runtime_value = NULL;
-  FridaScriptOptions * options;
+  MiruScriptOptions * options;
   GError * error = NULL;
   GBytes * bytes;
 
@@ -3936,7 +3936,7 @@ PySession_compile_script (PySession * self, PyObject * args, PyObject * kw)
     goto beach;
 
   Py_BEGIN_ALLOW_THREADS
-  bytes = frida_session_compile_script_sync (PY_GOBJECT_HANDLE (self), source, options, g_cancellable_get_current (), &error);
+  bytes = miru_session_compile_script_sync (PY_GOBJECT_HANDLE (self), source, options, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   if (error == NULL)
@@ -3947,7 +3947,7 @@ PySession_compile_script (PySession * self, PyObject * args, PyObject * kw)
   }
   else
   {
-    result = PyFrida_raise (error);
+    result = PyMiru_raise (error);
   }
 
 beach:
@@ -3959,31 +3959,31 @@ beach:
   return result;
 }
 
-static FridaScriptOptions *
+static MiruScriptOptions *
 PySession_parse_script_options (const gchar * name, gconstpointer snapshot_data, gsize snapshot_size, const gchar * runtime_value)
 {
-  FridaScriptOptions * options;
+  MiruScriptOptions * options;
 
-  options = frida_script_options_new ();
+  options = miru_script_options_new ();
 
   if (name != NULL)
-    frida_script_options_set_name (options, name);
+    miru_script_options_set_name (options, name);
 
   if (snapshot_data != NULL)
   {
     GBytes * snapshot = g_bytes_new (snapshot_data, snapshot_size);
-    frida_script_options_set_snapshot (options, snapshot);
+    miru_script_options_set_snapshot (options, snapshot);
     g_bytes_unref (snapshot);
   }
 
   if (runtime_value != NULL)
   {
-    FridaScriptRuntime runtime;
+    MiruScriptRuntime runtime;
 
-    if (!PyGObject_unmarshal_enum (runtime_value, FRIDA_TYPE_SCRIPT_RUNTIME, &runtime))
+    if (!PyGObject_unmarshal_enum (runtime_value, MIRU_TYPE_SCRIPT_RUNTIME, &runtime))
       goto invalid_argument;
 
-    frida_script_options_set_runtime (options, runtime);
+    miru_script_options_set_runtime (options, runtime);
   }
 
   return options;
@@ -4004,7 +4004,7 @@ PySession_snapshot_script (PySession * self, PyObject * args, PyObject * kw)
   char * embed_script;
   char * warmup_script = NULL;
   const char * runtime_value = NULL;
-  FridaSnapshotOptions * options;
+  MiruSnapshotOptions * options;
   GError * error = NULL;
   GBytes * bytes;
 
@@ -4016,7 +4016,7 @@ PySession_snapshot_script (PySession * self, PyObject * args, PyObject * kw)
     goto beach;
 
   Py_BEGIN_ALLOW_THREADS
-  bytes = frida_session_snapshot_script_sync (PY_GOBJECT_HANDLE (self), embed_script, options, g_cancellable_get_current (), &error);
+  bytes = miru_session_snapshot_script_sync (PY_GOBJECT_HANDLE (self), embed_script, options, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   if (error == NULL)
@@ -4027,7 +4027,7 @@ PySession_snapshot_script (PySession * self, PyObject * args, PyObject * kw)
   }
   else
   {
-    result = PyFrida_raise (error);
+    result = PyMiru_raise (error);
   }
 
 beach:
@@ -4039,24 +4039,24 @@ beach:
   return result;
 }
 
-static FridaSnapshotOptions *
+static MiruSnapshotOptions *
 PySession_parse_snapshot_options (const gchar * warmup_script, const gchar * runtime_value)
 {
-  FridaSnapshotOptions * options;
+  MiruSnapshotOptions * options;
 
-  options = frida_snapshot_options_new ();
+  options = miru_snapshot_options_new ();
 
   if (warmup_script != NULL)
-    frida_snapshot_options_set_warmup_script (options, warmup_script);
+    miru_snapshot_options_set_warmup_script (options, warmup_script);
 
   if (runtime_value != NULL)
   {
-    FridaScriptRuntime runtime;
+    MiruScriptRuntime runtime;
 
-    if (!PyGObject_unmarshal_enum (runtime_value, FRIDA_TYPE_SCRIPT_RUNTIME, &runtime))
+    if (!PyGObject_unmarshal_enum (runtime_value, MIRU_TYPE_SCRIPT_RUNTIME, &runtime))
       goto invalid_argument;
 
-    frida_snapshot_options_set_runtime (options, runtime);
+    miru_snapshot_options_set_runtime (options, runtime);
   }
 
   return options;
@@ -4076,7 +4076,7 @@ PySession_setup_peer_connection (PySession * self, PyObject * args, PyObject * k
   static char * keywords[] = { "stun_server", "relays", NULL };
   char * stun_server = NULL;
   PyObject * relays = NULL;
-  FridaPeerOptions * options = NULL;
+  MiruPeerOptions * options = NULL;
   GError * error = NULL;
 
   if (!PyArg_ParseTupleAndKeywords (args, kw, "|esO", keywords,
@@ -4089,7 +4089,7 @@ PySession_setup_peer_connection (PySession * self, PyObject * args, PyObject * k
     goto beach;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_session_setup_peer_connection_sync (PY_GOBJECT_HANDLE (self), options, g_cancellable_get_current (), &error);
+  miru_session_setup_peer_connection_sync (PY_GOBJECT_HANDLE (self), options, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   if (error != NULL)
@@ -4100,7 +4100,7 @@ PySession_setup_peer_connection (PySession * self, PyObject * args, PyObject * k
 
 propagate_error:
   {
-    PyFrida_raise (error);
+    PyMiru_raise (error);
     goto beach;
   }
 beach:
@@ -4112,19 +4112,19 @@ beach:
     if (!success)
       return NULL;
 
-    PyFrida_RETURN_NONE;
+    PyMiru_RETURN_NONE;
   }
 }
 
-static FridaPeerOptions *
+static MiruPeerOptions *
 PySession_parse_peer_options (const gchar * stun_server, PyObject * relays)
 {
-  FridaPeerOptions * options;
+  MiruPeerOptions * options;
   PyObject * relay;
 
-  options = frida_peer_options_new ();
+  options = miru_peer_options_new ();
 
-  frida_peer_options_set_stun_server (options, stun_server);
+  miru_peer_options_set_stun_server (options, stun_server);
 
   if (relays != NULL)
   {
@@ -4140,10 +4140,10 @@ PySession_parse_peer_options (const gchar * stun_server, PyObject * relays)
       if (relay == NULL)
         goto propagate_error;
 
-      if (!PyObject_IsInstance (relay, PYFRIDA_TYPE_OBJECT (Relay)))
+      if (!PyObject_IsInstance (relay, PYMIRU_TYPE_OBJECT (Relay)))
         goto expected_relay;
 
-      frida_peer_options_add_relay (options, PY_GOBJECT_HANDLE (relay));
+      miru_peer_options_add_relay (options, PY_GOBJECT_HANDLE (relay));
 
       Py_DecRef (relay);
     }
@@ -4175,9 +4175,9 @@ PySession_join_portal (PySession * self, PyObject * args, PyObject * kw)
   char * certificate = NULL;
   char * token = NULL;
   PyObject * acl = NULL;
-  FridaPortalOptions * options;
+  MiruPortalOptions * options;
   GError * error = NULL;
-  FridaPortalMembership * handle;
+  MiruPortalMembership * handle;
 
   if (!PyArg_ParseTupleAndKeywords (args, kw, "es|esesO", keywords,
         "utf-8", &address,
@@ -4191,12 +4191,12 @@ PySession_join_portal (PySession * self, PyObject * args, PyObject * kw)
     goto beach;
 
   Py_BEGIN_ALLOW_THREADS
-  handle = frida_session_join_portal_sync (PY_GOBJECT_HANDLE (self), address, options, g_cancellable_get_current (), &error);
+  handle = miru_session_join_portal_sync (PY_GOBJECT_HANDLE (self), address, options, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   result = (error == NULL)
       ? PyPortalMembership_new_take_handle (handle)
-      : PyFrida_raise (error);
+      : PyMiru_raise (error);
 
 beach:
   g_clear_object (&options);
@@ -4208,12 +4208,12 @@ beach:
   return result;
 }
 
-static FridaPortalOptions *
+static MiruPortalOptions *
 PySession_parse_portal_options (const gchar * certificate_value, const gchar * token, PyObject * acl_value)
 {
-  FridaPortalOptions * options;
+  MiruPortalOptions * options;
 
-  options = frida_portal_options_new ();
+  options = miru_portal_options_new ();
 
   if (certificate_value != NULL)
   {
@@ -4222,13 +4222,13 @@ PySession_parse_portal_options (const gchar * certificate_value, const gchar * t
     if (!PyGObject_unmarshal_certificate (certificate_value, &certificate))
       goto propagate_error;
 
-    frida_portal_options_set_certificate (options, certificate);
+    miru_portal_options_set_certificate (options, certificate);
 
     g_object_unref (certificate);
   }
 
   if (token != NULL)
-    frida_portal_options_set_token (options, token);
+    miru_portal_options_set_token (options, token);
 
   if (acl_value != NULL)
   {
@@ -4238,7 +4238,7 @@ PySession_parse_portal_options (const gchar * certificate_value, const gchar * t
     if (!PyGObject_unmarshal_strv (acl_value, &acl, &acl_length))
       goto propagate_error;
 
-    frida_portal_options_set_acl (options, acl, acl_length);
+    miru_portal_options_set_acl (options, acl, acl_length);
 
     g_strfreev (acl);
   }
@@ -4255,9 +4255,9 @@ propagate_error:
 
 
 static PyObject *
-PyScript_new_take_handle (FridaScript * handle)
+PyScript_new_take_handle (MiruScript * handle)
 {
-  return PyGObject_new_take_handle (handle, PYFRIDA_TYPE (Script));
+  return PyGObject_new_take_handle (handle, PYMIRU_TYPE (Script));
 }
 
 static PyObject *
@@ -4266,7 +4266,7 @@ PyScript_is_destroyed (PyScript * self)
   gboolean is_destroyed;
 
   Py_BEGIN_ALLOW_THREADS
-  is_destroyed = frida_script_is_destroyed (PY_GOBJECT_HANDLE (self));
+  is_destroyed = miru_script_is_destroyed (PY_GOBJECT_HANDLE (self));
   Py_END_ALLOW_THREADS
 
   return PyBool_FromLong (is_destroyed);
@@ -4278,12 +4278,12 @@ PyScript_load (PyScript * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_script_load_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_script_load_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -4292,12 +4292,12 @@ PyScript_unload (PyScript * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_script_unload_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_script_unload_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -4306,12 +4306,12 @@ PyScript_eternalize (PyScript * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_script_eternalize_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_script_eternalize_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -4329,13 +4329,13 @@ PyScript_post (PyScript * self, PyObject * args, PyObject * kw)
   data = (data_buffer != NULL) ? g_bytes_new (data_buffer, data_size) : NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_script_post (PY_GOBJECT_HANDLE (self), message, data);
+  miru_script_post (PY_GOBJECT_HANDLE (self), message, data);
   Py_END_ALLOW_THREADS
 
   g_bytes_unref (data);
   PyMem_Free (message);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -4349,12 +4349,12 @@ PyScript_enable_debugger (PyScript * self, PyObject * args, PyObject * kw)
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_script_enable_debugger_sync (PY_GOBJECT_HANDLE (self), port, g_cancellable_get_current (), &error);
+  miru_script_enable_debugger_sync (PY_GOBJECT_HANDLE (self), port, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -4363,12 +4363,12 @@ PyScript_disable_debugger (PyScript * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_script_disable_debugger_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_script_disable_debugger_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 
@@ -4381,8 +4381,8 @@ PyRelay_init (PyRelay * self, PyObject * args, PyObject * kw)
   char * username = NULL;
   char * password = NULL;
   char * kind_value = NULL;
-  FridaRelayKind kind;
-  FridaRelay * handle;
+  MiruRelayKind kind;
+  MiruRelay * handle;
 
   if (PyGObject_tp_init ((PyObject *) self, args, kw) < 0)
     return -1;
@@ -4394,12 +4394,12 @@ PyRelay_init (PyRelay * self, PyObject * args, PyObject * kw)
         "utf-8", &kind_value))
     return -1;
 
-  if (!PyGObject_unmarshal_enum (kind_value, FRIDA_TYPE_RELAY_KIND, &kind))
+  if (!PyGObject_unmarshal_enum (kind_value, MIRU_TYPE_RELAY_KIND, &kind))
     goto beach;
 
-  handle = frida_relay_new (address, username, password, kind);
+  handle = miru_relay_new (address, username, password, kind);
 
-  PyGObject_take_handle (&self->parent, handle, PYFRIDA_TYPE (Relay));
+  PyGObject_take_handle (&self->parent, handle, PYMIRU_TYPE (Relay));
 
   PyRelay_init_from_handle (self, handle);
 
@@ -4415,12 +4415,12 @@ beach:
 }
 
 static void
-PyRelay_init_from_handle (PyRelay * self, FridaRelay * handle)
+PyRelay_init_from_handle (PyRelay * self, MiruRelay * handle)
 {
-  self->address = PyUnicode_FromString (frida_relay_get_address (handle));
-  self->username = PyUnicode_FromString (frida_relay_get_username (handle));
-  self->password = PyUnicode_FromString (frida_relay_get_password (handle));
-  self->kind = PyGObject_marshal_enum (frida_relay_get_kind (handle), FRIDA_TYPE_RELAY_KIND);
+  self->address = PyUnicode_FromString (miru_relay_get_address (handle));
+  self->username = PyUnicode_FromString (miru_relay_get_username (handle));
+  self->password = PyUnicode_FromString (miru_relay_get_password (handle));
+  self->kind = PyGObject_marshal_enum (miru_relay_get_kind (handle), MIRU_TYPE_RELAY_KIND);
 }
 
 static void
@@ -4460,9 +4460,9 @@ PyRelay_repr (PyRelay * self)
 
 
 static PyObject *
-PyPortalMembership_new_take_handle (FridaPortalMembership * handle)
+PyPortalMembership_new_take_handle (MiruPortalMembership * handle)
 {
-  return PyGObject_new_take_handle (handle, PYFRIDA_TYPE (PortalMembership));
+  return PyGObject_new_take_handle (handle, PYMIRU_TYPE (PortalMembership));
 }
 
 static PyObject *
@@ -4471,12 +4471,12 @@ PyPortalMembership_terminate (PyPortalMembership * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_portal_membership_terminate_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_portal_membership_terminate_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 
@@ -4486,22 +4486,22 @@ PyPortalService_init (PyPortalService * self, PyObject * args, PyObject * kw)
   static char * keywords[] = { "cluster_params", "control_params", NULL };
   PyEndpointParameters * cluster_params;
   PyEndpointParameters * control_params = NULL;
-  FridaPortalService * handle;
+  MiruPortalService * handle;
 
   if (PyGObject_tp_init ((PyObject *) self, args, kw) < 0)
     return -1;
 
   if (!PyArg_ParseTupleAndKeywords (args, kw, "O!|O!", keywords,
-        PYFRIDA_TYPE_OBJECT (EndpointParameters), &cluster_params,
-        PYFRIDA_TYPE_OBJECT (EndpointParameters), &control_params))
+        PYMIRU_TYPE_OBJECT (EndpointParameters), &cluster_params,
+        PYMIRU_TYPE_OBJECT (EndpointParameters), &control_params))
     return -1;
 
   g_atomic_int_inc (&toplevel_objects_alive);
 
-  handle = frida_portal_service_new (PY_GOBJECT_HANDLE (cluster_params),
+  handle = miru_portal_service_new (PY_GOBJECT_HANDLE (cluster_params),
       (control_params != NULL) ? PY_GOBJECT_HANDLE (control_params) : NULL);
 
-  PyGObject_take_handle (&self->parent, handle, PYFRIDA_TYPE (PortalService));
+  PyGObject_take_handle (&self->parent, handle, PYMIRU_TYPE (PortalService));
 
   PyPortalService_init_from_handle (self, handle);
 
@@ -4509,15 +4509,15 @@ PyPortalService_init (PyPortalService * self, PyObject * args, PyObject * kw)
 }
 
 static void
-PyPortalService_init_from_handle (PyPortalService * self, FridaPortalService * handle)
+PyPortalService_init_from_handle (PyPortalService * self, MiruPortalService * handle)
 {
-  self->device = PyDevice_new_take_handle (g_object_ref (frida_portal_service_get_device (handle)));
+  self->device = PyDevice_new_take_handle (g_object_ref (miru_portal_service_get_device (handle)));
 }
 
 static void
 PyPortalService_dealloc (PyPortalService * self)
 {
-  FridaPortalService * handle;
+  MiruPortalService * handle;
 
   g_atomic_int_dec_and_test (&toplevel_objects_alive);
 
@@ -4525,8 +4525,8 @@ PyPortalService_dealloc (PyPortalService * self)
   if (handle != NULL)
   {
     Py_BEGIN_ALLOW_THREADS
-    frida_portal_service_stop_sync (handle, NULL, NULL);
-    frida_unref (handle);
+    miru_portal_service_stop_sync (handle, NULL, NULL);
+    miru_unref (handle);
     Py_END_ALLOW_THREADS
   }
 
@@ -4541,12 +4541,12 @@ PyPortalService_start (PyPortalService * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_portal_service_start_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_portal_service_start_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -4555,12 +4555,12 @@ PyPortalService_stop (PyPortalService * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_portal_service_stop_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_portal_service_stop_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -4572,10 +4572,10 @@ PyPortalService_kick (PyScript * self, PyObject * args)
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_portal_service_kick (PY_GOBJECT_HANDLE (self), connection_id);
+  miru_portal_service_kick (PY_GOBJECT_HANDLE (self), connection_id);
   Py_END_ALLOW_THREADS
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -4597,13 +4597,13 @@ PyPortalService_post (PyScript * self, PyObject * args, PyObject * kw)
   data = (data_buffer != NULL) ? g_bytes_new (data_buffer, data_size) : NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_portal_service_post (PY_GOBJECT_HANDLE (self), connection_id, message, data);
+  miru_portal_service_post (PY_GOBJECT_HANDLE (self), connection_id, message, data);
   Py_END_ALLOW_THREADS
 
   g_bytes_unref (data);
   PyMem_Free (message);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -4624,14 +4624,14 @@ PyPortalService_narrowcast (PyScript * self, PyObject * args, PyObject * kw)
   data = (data_buffer != NULL) ? g_bytes_new (data_buffer, data_size) : NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_portal_service_narrowcast (PY_GOBJECT_HANDLE (self), tag, message, data);
+  miru_portal_service_narrowcast (PY_GOBJECT_HANDLE (self), tag, message, data);
   Py_END_ALLOW_THREADS
 
   g_bytes_unref (data);
   PyMem_Free (message);
   PyMem_Free (tag);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -4651,13 +4651,13 @@ PyPortalService_broadcast (PyScript * self, PyObject * args, PyObject * kw)
   data = (data_buffer != NULL) ? g_bytes_new (data_buffer, data_size) : NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_portal_service_broadcast (PY_GOBJECT_HANDLE (self), message, data);
+  miru_portal_service_broadcast (PY_GOBJECT_HANDLE (self), message, data);
   Py_END_ALLOW_THREADS
 
   g_bytes_unref (data);
   PyMem_Free (message);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -4672,7 +4672,7 @@ PyPortalService_enumerate_tags (PyScript * self, PyObject * args)
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  tags = frida_portal_service_enumerate_tags (PY_GOBJECT_HANDLE (self), connection_id, &tags_length);
+  tags = miru_portal_service_enumerate_tags (PY_GOBJECT_HANDLE (self), connection_id, &tags_length);
   Py_END_ALLOW_THREADS
 
   result = PyGObject_marshal_strv (tags, tags_length);
@@ -4694,12 +4694,12 @@ PyPortalService_tag (PyScript * self, PyObject * args, PyObject * kw)
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_portal_service_tag (PY_GOBJECT_HANDLE (self), connection_id, tag);
+  miru_portal_service_tag (PY_GOBJECT_HANDLE (self), connection_id, tag);
   Py_END_ALLOW_THREADS
 
   PyMem_Free (tag);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -4715,12 +4715,12 @@ PyPortalService_untag (PyScript * self, PyObject * args, PyObject * kw)
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_portal_service_untag (PY_GOBJECT_HANDLE (self), connection_id, tag);
+  miru_portal_service_untag (PY_GOBJECT_HANDLE (self), connection_id, tag);
   Py_END_ALLOW_THREADS
 
   PyMem_Free (tag);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 
@@ -4737,9 +4737,9 @@ PyEndpointParameters_init (PyEndpointParameters * self, PyObject * args, PyObjec
   PyObject * auth_callback = NULL;
   char * asset_root_value = NULL;
   GTlsCertificate * certificate = NULL;
-  FridaAuthenticationService * auth_service = NULL;
+  MiruAuthenticationService * auth_service = NULL;
   GFile * asset_root = NULL;
-  FridaEndpointParameters * handle;
+  MiruEndpointParameters * handle;
 
   if (PyGObject_tp_init ((PyObject *) self, args, kw) < 0)
     return -1;
@@ -4758,16 +4758,16 @@ PyEndpointParameters_init (PyEndpointParameters * self, PyObject * args, PyObjec
     goto beach;
 
   if (auth_token != NULL)
-    auth_service = FRIDA_AUTHENTICATION_SERVICE (frida_static_authentication_service_new (auth_token));
+    auth_service = MIRU_AUTHENTICATION_SERVICE (miru_static_authentication_service_new (auth_token));
   else if (auth_callback != NULL)
-    auth_service = FRIDA_AUTHENTICATION_SERVICE (frida_python_authentication_service_new (auth_callback));
+    auth_service = MIRU_AUTHENTICATION_SERVICE (miru_python_authentication_service_new (auth_callback));
 
   if (asset_root_value != NULL)
     asset_root = g_file_new_for_path (asset_root_value);
 
-  handle = frida_endpoint_parameters_new (address, port, certificate, origin, auth_service, asset_root);
+  handle = miru_endpoint_parameters_new (address, port, certificate, origin, auth_service, asset_root);
 
-  PyGObject_take_handle (&self->parent, handle, PYFRIDA_TYPE (EndpointParameters));
+  PyGObject_take_handle (&self->parent, handle, PYMIRU_TYPE (EndpointParameters));
 
   result = 0;
 
@@ -4786,15 +4786,15 @@ beach:
 }
 
 
-G_DEFINE_TYPE_EXTENDED (FridaPythonAuthenticationService, frida_python_authentication_service, G_TYPE_OBJECT, 0,
-    G_IMPLEMENT_INTERFACE (FRIDA_TYPE_AUTHENTICATION_SERVICE, frida_python_authentication_service_iface_init))
+G_DEFINE_TYPE_EXTENDED (MiruPythonAuthenticationService, miru_python_authentication_service, G_TYPE_OBJECT, 0,
+    G_IMPLEMENT_INTERFACE (MIRU_TYPE_AUTHENTICATION_SERVICE, miru_python_authentication_service_iface_init))
 
-static FridaPythonAuthenticationService *
-frida_python_authentication_service_new (PyObject * callback)
+static MiruPythonAuthenticationService *
+miru_python_authentication_service_new (PyObject * callback)
 {
-  FridaPythonAuthenticationService * service;
+  MiruPythonAuthenticationService * service;
 
-  service = g_object_new (FRIDA_TYPE_PYTHON_AUTHENTICATION_SERVICE, NULL);
+  service = g_object_new (MIRU_TYPE_PYTHON_AUTHENTICATION_SERVICE, NULL);
   service->callback = callback;
   Py_IncRef (callback);
 
@@ -4802,32 +4802,32 @@ frida_python_authentication_service_new (PyObject * callback)
 }
 
 static void
-frida_python_authentication_service_class_init (FridaPythonAuthenticationServiceClass * klass)
+miru_python_authentication_service_class_init (MiruPythonAuthenticationServiceClass * klass)
 {
   GObjectClass * object_class = G_OBJECT_CLASS (klass);
 
-  object_class->dispose = frida_python_authentication_service_dispose;
+  object_class->dispose = miru_python_authentication_service_dispose;
 }
 
 static void
-frida_python_authentication_service_iface_init (gpointer g_iface, gpointer iface_data)
+miru_python_authentication_service_iface_init (gpointer g_iface, gpointer iface_data)
 {
-  FridaAuthenticationServiceIface * iface = g_iface;
+  MiruAuthenticationServiceIface * iface = g_iface;
 
-  iface->authenticate = frida_python_authentication_service_authenticate;
-  iface->authenticate_finish = frida_python_authentication_service_authenticate_finish;
+  iface->authenticate = miru_python_authentication_service_authenticate;
+  iface->authenticate_finish = miru_python_authentication_service_authenticate_finish;
 }
 
 static void
-frida_python_authentication_service_init (FridaPythonAuthenticationService * self)
+miru_python_authentication_service_init (MiruPythonAuthenticationService * self)
 {
-  self->pool = g_thread_pool_new ((GFunc) frida_python_authentication_service_do_authenticate, self, 1, FALSE, NULL);
+  self->pool = g_thread_pool_new ((GFunc) miru_python_authentication_service_do_authenticate, self, 1, FALSE, NULL);
 }
 
 static void
-frida_python_authentication_service_dispose (GObject * object)
+miru_python_authentication_service_dispose (GObject * object)
 {
-  FridaPythonAuthenticationService * self = FRIDA_PYTHON_AUTHENTICATION_SERVICE (object);
+  MiruPythonAuthenticationService * self = MIRU_PYTHON_AUTHENTICATION_SERVICE (object);
 
   if (self->pool != NULL)
   {
@@ -4847,17 +4847,17 @@ frida_python_authentication_service_dispose (GObject * object)
     PyGILState_Release (gstate);
   }
 
-  G_OBJECT_CLASS (frida_python_authentication_service_parent_class)->dispose (object);
+  G_OBJECT_CLASS (miru_python_authentication_service_parent_class)->dispose (object);
 }
 
 static void
-frida_python_authentication_service_authenticate (FridaAuthenticationService * service, const gchar * token, GCancellable * cancellable,
+miru_python_authentication_service_authenticate (MiruAuthenticationService * service, const gchar * token, GCancellable * cancellable,
     GAsyncReadyCallback callback, gpointer user_data)
 {
-  FridaPythonAuthenticationService * self;
+  MiruPythonAuthenticationService * self;
   GTask * task;
 
-  self = FRIDA_PYTHON_AUTHENTICATION_SERVICE (service);
+  self = MIRU_PYTHON_AUTHENTICATION_SERVICE (service);
 
   task = g_task_new (self, cancellable, callback, user_data);
   g_task_set_task_data (task, g_strdup (token), g_free);
@@ -4866,13 +4866,13 @@ frida_python_authentication_service_authenticate (FridaAuthenticationService * s
 }
 
 static gchar *
-frida_python_authentication_service_authenticate_finish (FridaAuthenticationService * service, GAsyncResult * result, GError ** error)
+miru_python_authentication_service_authenticate_finish (MiruAuthenticationService * service, GAsyncResult * result, GError ** error)
 {
   return g_task_propagate_pointer (G_TASK (result), error);
 }
 
 static void
-frida_python_authentication_service_do_authenticate (GTask * task, FridaPythonAuthenticationService * self)
+miru_python_authentication_service_do_authenticate (GTask * task, MiruPythonAuthenticationService * self)
 {
   const gchar * token;
   PyGILState_STATE gstate;
@@ -4914,7 +4914,7 @@ frida_python_authentication_service_do_authenticate (GTask * task, FridaPythonAu
   if (session_info != NULL)
     g_task_return_pointer (task, session_info, g_free);
   else
-    g_task_return_new_error (task, FRIDA_ERROR, FRIDA_ERROR_INVALID_ARGUMENT, "%s", message);
+    g_task_return_new_error (task, MIRU_ERROR, MIRU_ERROR_INVALID_ARGUMENT, "%s", message);
 
   g_free (message);
   g_object_unref (task);
@@ -4929,7 +4929,7 @@ PyCompiler_init (PyCompiler * self, PyObject * args, PyObject * kw)
 
   g_atomic_int_inc (&toplevel_objects_alive);
 
-  PyGObject_take_handle (&self->parent, frida_compiler_new (NULL), PYFRIDA_TYPE (Compiler));
+  PyGObject_take_handle (&self->parent, miru_compiler_new (NULL), PYMIRU_TYPE (Compiler));
 
   return 0;
 }
@@ -4957,7 +4957,7 @@ PyCompiler_build (PyCompiler * self, PyObject * args, PyObject * kw)
   const char * compression = NULL;
   const char * platform = NULL;
   PyObject * externals = NULL;
-  FridaBuildOptions * options;
+  MiruBuildOptions * options;
   GError * error = NULL;
   gchar * bundle;
 
@@ -4965,19 +4965,19 @@ PyCompiler_build (PyCompiler * self, PyObject * args, PyObject * kw)
         &type_check, &source_maps, &compression, &platform, &externals))
     return NULL;
 
-  options = frida_build_options_new ();
-  if (!PyCompiler_set_options (FRIDA_COMPILER_OPTIONS (options), project_root, output_format, bundle_format, type_check, source_maps,
+  options = miru_build_options_new ();
+  if (!PyCompiler_set_options (MIRU_COMPILER_OPTIONS (options), project_root, output_format, bundle_format, type_check, source_maps,
         compression, platform, externals))
     goto invalid_option_value;
 
   Py_BEGIN_ALLOW_THREADS
-  bundle = frida_compiler_build_sync (PY_GOBJECT_HANDLE (self), entrypoint, options, g_cancellable_get_current (), &error);
+  bundle = miru_compiler_build_sync (PY_GOBJECT_HANDLE (self), entrypoint, options, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   g_object_unref (options);
 
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
   result = PyUnicode_FromString (bundle);
   g_free (bundle);
@@ -5005,28 +5005,28 @@ PyCompiler_watch (PyCompiler * self, PyObject * args, PyObject * kw)
   const char * compression = NULL;
   const char * platform = NULL;
   PyObject * externals = NULL;
-  FridaWatchOptions * options;
+  MiruWatchOptions * options;
   GError * error = NULL;
 
   if (!PyArg_ParseTupleAndKeywords (args, kw, "s|sssssssO", keywords, &entrypoint, &project_root, &output_format, &bundle_format,
         &type_check, &source_maps, &compression, &platform, &externals))
     return NULL;
 
-  options = frida_watch_options_new ();
-  if (!PyCompiler_set_options (FRIDA_COMPILER_OPTIONS (options), project_root, output_format, bundle_format, type_check, source_maps,
+  options = miru_watch_options_new ();
+  if (!PyCompiler_set_options (MIRU_COMPILER_OPTIONS (options), project_root, output_format, bundle_format, type_check, source_maps,
         compression, platform, externals))
     goto invalid_option_value;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_compiler_watch_sync (PY_GOBJECT_HANDLE (self), entrypoint, options, g_cancellable_get_current (), &error);
+  miru_compiler_watch_sync (PY_GOBJECT_HANDLE (self), entrypoint, options, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   g_object_unref (options);
 
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 
 invalid_option_value:
   {
@@ -5036,71 +5036,71 @@ invalid_option_value:
 }
 
 static gboolean
-PyCompiler_set_options (FridaCompilerOptions * options, const gchar * project_root_value, const gchar * output_format_value,
+PyCompiler_set_options (MiruCompilerOptions * options, const gchar * project_root_value, const gchar * output_format_value,
     const gchar * bundle_format_value, const gchar * type_check_value, const gchar * source_maps_value, const gchar * compression_value,
     const gchar * platform_value, PyObject * externals_value)
 {
   if (project_root_value != NULL)
-    frida_compiler_options_set_project_root (options, project_root_value);
+    miru_compiler_options_set_project_root (options, project_root_value);
 
   if (output_format_value != NULL)
   {
-    FridaOutputFormat output_format;
+    MiruOutputFormat output_format;
 
-    if (!PyGObject_unmarshal_enum (output_format_value, FRIDA_TYPE_OUTPUT_FORMAT, &output_format))
+    if (!PyGObject_unmarshal_enum (output_format_value, MIRU_TYPE_OUTPUT_FORMAT, &output_format))
       return FALSE;
 
-    frida_compiler_options_set_output_format (options, output_format);
+    miru_compiler_options_set_output_format (options, output_format);
   }
 
   if (bundle_format_value != NULL)
   {
-    FridaBundleFormat bundle_format;
+    MiruBundleFormat bundle_format;
 
-    if (!PyGObject_unmarshal_enum (bundle_format_value, FRIDA_TYPE_BUNDLE_FORMAT, &bundle_format))
+    if (!PyGObject_unmarshal_enum (bundle_format_value, MIRU_TYPE_BUNDLE_FORMAT, &bundle_format))
       return FALSE;
 
-    frida_compiler_options_set_bundle_format (options, bundle_format);
+    miru_compiler_options_set_bundle_format (options, bundle_format);
   }
 
   if (type_check_value != NULL)
   {
-    FridaTypeCheckMode type_check;
+    MiruTypeCheckMode type_check;
 
-    if (!PyGObject_unmarshal_enum (type_check_value, FRIDA_TYPE_TYPE_CHECK_MODE, &type_check))
+    if (!PyGObject_unmarshal_enum (type_check_value, MIRU_TYPE_TYPE_CHECK_MODE, &type_check))
       return FALSE;
 
-    frida_compiler_options_set_type_check (options, type_check);
+    miru_compiler_options_set_type_check (options, type_check);
   }
 
   if (source_maps_value != NULL)
   {
-    FridaSourceMaps source_maps;
+    MiruSourceMaps source_maps;
 
-    if (!PyGObject_unmarshal_enum (source_maps_value, FRIDA_TYPE_SOURCE_MAPS, &source_maps))
+    if (!PyGObject_unmarshal_enum (source_maps_value, MIRU_TYPE_SOURCE_MAPS, &source_maps))
       return FALSE;
 
-    frida_compiler_options_set_source_maps (options, source_maps);
+    miru_compiler_options_set_source_maps (options, source_maps);
   }
 
   if (compression_value != NULL)
   {
-    FridaJsCompression compression;
+    MiruJsCompression compression;
 
-    if (!PyGObject_unmarshal_enum (compression_value, FRIDA_TYPE_JS_COMPRESSION, &compression))
+    if (!PyGObject_unmarshal_enum (compression_value, MIRU_TYPE_JS_COMPRESSION, &compression))
       return FALSE;
 
-    frida_compiler_options_set_compression (options, compression);
+    miru_compiler_options_set_compression (options, compression);
   }
 
   if (platform_value != NULL)
   {
-    FridaJsPlatform platform;
+    MiruJsPlatform platform;
 
-    if (!PyGObject_unmarshal_enum (platform_value, FRIDA_TYPE_JS_PLATFORM, &platform))
+    if (!PyGObject_unmarshal_enum (platform_value, MIRU_TYPE_JS_PLATFORM, &platform))
       return FALSE;
 
-    frida_compiler_options_set_platform (options, platform);
+    miru_compiler_options_set_platform (options, platform);
   }
 
   if (externals_value != NULL)
@@ -5124,7 +5124,7 @@ PyCompiler_set_options (FridaCompilerOptions * options, const gchar * project_ro
       if (external == NULL)
         return FALSE;
 
-      frida_compiler_options_add_external (options, external);
+      miru_compiler_options_add_external (options, external);
 
       g_free (external);
     }
@@ -5142,7 +5142,7 @@ PyPackageManager_init (PyPackageManager * self, PyObject * args, PyObject * kw)
 
   g_atomic_int_inc (&toplevel_objects_alive);
 
-  PyGObject_take_handle (&self->parent, frida_package_manager_new (), PYFRIDA_TYPE (PackageManager));
+  PyGObject_take_handle (&self->parent, miru_package_manager_new (), PYMIRU_TYPE (PackageManager));
 
   return 0;
 }
@@ -5161,7 +5161,7 @@ PyPackageManager_repr (PyPackageManager * self)
   PyObject * result;
   gchar * repr;
 
-  repr = g_strdup_printf ("PackageManager(registry=\"%s\")", frida_package_manager_get_registry (PY_GOBJECT_HANDLE (self)));
+  repr = g_strdup_printf ("PackageManager(registry=\"%s\")", miru_package_manager_get_registry (PY_GOBJECT_HANDLE (self)));
   result = PyUnicode_FromString (repr);
   g_free (repr);
 
@@ -5171,7 +5171,7 @@ PyPackageManager_repr (PyPackageManager * self)
 static PyObject *
 PyPackageManager_get_registry (PyPackageManager * self, void * closure)
 {
-  return PyUnicode_FromString (frida_package_manager_get_registry (PY_GOBJECT_HANDLE (self)));
+  return PyUnicode_FromString (miru_package_manager_get_registry (PY_GOBJECT_HANDLE (self)));
 }
 
 static int
@@ -5181,7 +5181,7 @@ PyPackageManager_set_registry (PyPackageManager * self, PyObject * val, void * c
 
   if (!PyGObject_unmarshal_string (val, &registry))
     return -1;
-  frida_package_manager_set_registry (PY_GOBJECT_HANDLE (self), registry);
+  miru_package_manager_set_registry (PY_GOBJECT_HANDLE (self), registry);
   g_free (registry);
 
   return 0;
@@ -5190,33 +5190,33 @@ PyPackageManager_set_registry (PyPackageManager * self, PyObject * val, void * c
 static PyObject *
 PyPackageManager_search (PyPackageManager * self, PyObject * args, PyObject * kw)
 {
-  FridaPackageSearchResult * result;
+  MiruPackageSearchResult * result;
   static char * keywords[] = { "query", "offset", "limit", NULL };
   const char * query;
   guint offset = G_MAXUINT;
   guint limit = G_MAXUINT;
-  FridaPackageSearchOptions * options;
+  MiruPackageSearchOptions * options;
   GError * error = NULL;
 
   if (!PyArg_ParseTupleAndKeywords (args, kw, "s|II", keywords, &query, &offset, &limit))
     return NULL;
 
-  options = frida_package_search_options_new ();
+  options = miru_package_search_options_new ();
 
   if (offset != G_MAXUINT)
-    frida_package_search_options_set_offset (options, offset);
+    miru_package_search_options_set_offset (options, offset);
 
   if (limit != G_MAXUINT)
-    frida_package_search_options_set_limit (options, limit);
+    miru_package_search_options_set_limit (options, limit);
 
   Py_BEGIN_ALLOW_THREADS
-  result = frida_package_manager_search_sync (PY_GOBJECT_HANDLE (self), query, options, g_cancellable_get_current (), &error);
+  result = miru_package_manager_search_sync (PY_GOBJECT_HANDLE (self), query, options, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   g_object_unref (options);
 
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
   return PyPackageSearchResult_new_take_handle (result);
 }
@@ -5224,13 +5224,13 @@ PyPackageManager_search (PyPackageManager * self, PyObject * args, PyObject * kw
 static PyObject *
 PyPackageManager_install (PyPackageManager * self, PyObject * args, PyObject * kw)
 {
-  FridaPackageInstallResult * result;
+  MiruPackageInstallResult * result;
   static char * keywords[] = { "project_root", "role", "specs", "omits", NULL };
   const char * project_root = NULL;
   const char * role_value = NULL;
   PyObject * specs = NULL;
   PyObject * omits = NULL;
-  FridaPackageInstallOptions * options;
+  MiruPackageInstallOptions * options;
   GError * error = NULL;
 
   if (!PyArg_ParseTupleAndKeywords (args, kw, "|ssOO", keywords, &project_root, &role_value, &specs, &omits))
@@ -5239,35 +5239,35 @@ PyPackageManager_install (PyPackageManager * self, PyObject * args, PyObject * k
   options = PyPackageManager_parse_install_options (project_root, role_value, specs, omits);
 
   Py_BEGIN_ALLOW_THREADS
-  result = frida_package_manager_install_sync (PY_GOBJECT_HANDLE (self), options, g_cancellable_get_current (), &error);
+  result = miru_package_manager_install_sync (PY_GOBJECT_HANDLE (self), options, g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
 
   g_object_unref (options);
 
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
   return PyPackageInstallResult_new_take_handle (result);
 }
 
-static FridaPackageInstallOptions *
+static MiruPackageInstallOptions *
 PyPackageManager_parse_install_options (const gchar * project_root, const char * role_value, PyObject * specs_value, PyObject * omits_value)
 {
-  FridaPackageInstallOptions * options;
+  MiruPackageInstallOptions * options;
 
-  options = frida_package_install_options_new ();
+  options = miru_package_install_options_new ();
 
   if (project_root != NULL)
-    frida_package_install_options_set_project_root (options, project_root);
+    miru_package_install_options_set_project_root (options, project_root);
 
   if (role_value != NULL)
   {
-    FridaPackageRole role;
+    MiruPackageRole role;
 
-    if (!PyGObject_unmarshal_enum (role_value, FRIDA_TYPE_PACKAGE_ROLE, &role))
+    if (!PyGObject_unmarshal_enum (role_value, MIRU_TYPE_PACKAGE_ROLE, &role))
       goto propagate_error;
 
-    frida_package_install_options_set_role (options, role);
+    miru_package_install_options_set_role (options, role);
   }
 
   if (specs_value != NULL)
@@ -5291,7 +5291,7 @@ PyPackageManager_parse_install_options (const gchar * project_root, const char *
       if (spec == NULL)
         goto propagate_error;
 
-      frida_package_install_options_add_spec (options, spec);
+      miru_package_install_options_add_spec (options, spec);
 
       g_free (spec);
     }
@@ -5309,7 +5309,7 @@ PyPackageManager_parse_install_options (const gchar * project_root, const char *
     {
       PyObject * element;
       gchar * str = NULL;
-      FridaPackageRole role;
+      MiruPackageRole role;
 
       element = PySequence_GetItem (omits_value, i);
       if (element == NULL)
@@ -5319,10 +5319,10 @@ PyPackageManager_parse_install_options (const gchar * project_root, const char *
       if (str == NULL)
         goto propagate_error;
 
-      if (!PyGObject_unmarshal_enum (str, FRIDA_TYPE_PACKAGE_ROLE, &role))
+      if (!PyGObject_unmarshal_enum (str, MIRU_TYPE_PACKAGE_ROLE, &role))
         goto propagate_error;
 
-      frida_package_install_options_add_omit (options, role);
+      miru_package_install_options_add_omit (options, role);
     }
   }
 
@@ -5338,9 +5338,9 @@ propagate_error:
 
 
 static PyObject *
-PyPackage_new_take_handle (FridaPackage * handle)
+PyPackage_new_take_handle (MiruPackage * handle)
 {
-  return PyGObject_new_take_handle (handle, PYFRIDA_TYPE (Package));
+  return PyGObject_new_take_handle (handle, PYMIRU_TYPE (Package));
 }
 
 static int
@@ -5358,12 +5358,12 @@ PyPackage_init (PyPackage * self, PyObject * args, PyObject * kw)
 }
 
 static void
-PyPackage_init_from_handle (PyPackage * self, FridaPackage * handle)
+PyPackage_init_from_handle (PyPackage * self, MiruPackage * handle)
 {
-  self->name = PyUnicode_FromString (frida_package_get_name (handle));
-  self->version = PyUnicode_FromString (frida_package_get_version (handle));
-  self->description = PyGObject_marshal_string (frida_package_get_description (handle));
-  self->url = PyGObject_marshal_string (frida_package_get_url (handle));
+  self->name = PyUnicode_FromString (miru_package_get_name (handle));
+  self->version = PyUnicode_FromString (miru_package_get_version (handle));
+  self->description = PyGObject_marshal_string (miru_package_get_description (handle));
+  self->url = PyGObject_marshal_string (miru_package_get_url (handle));
 }
 
 static void
@@ -5381,7 +5381,7 @@ static PyObject *
 PyPackage_repr (PyPackage * self)
 {
   PyObject * result;
-  FridaPackage * handle;
+  MiruPackage * handle;
   GString * repr;
   const gchar * description, * url;
 
@@ -5390,10 +5390,10 @@ PyPackage_repr (PyPackage * self)
   repr = g_string_sized_new (256);
 
   g_string_append_printf (repr, "Package(name=\"%s\", version=\"%s\"",
-      frida_package_get_name (handle),
-      frida_package_get_version (handle));
+      miru_package_get_name (handle),
+      miru_package_get_version (handle));
 
-  description = frida_package_get_description (handle);
+  description = miru_package_get_description (handle);
   if (description != NULL)
   {
     gchar * escaped = g_strescape (description, NULL);
@@ -5401,7 +5401,7 @@ PyPackage_repr (PyPackage * self)
     g_free (escaped);
   }
 
-  url = frida_package_get_url (handle);
+  url = miru_package_get_url (handle);
   if (url != NULL)
     g_string_append_printf (repr, ", url=\"%s\"", url);
 
@@ -5416,24 +5416,24 @@ PyPackage_repr (PyPackage * self)
 
 
 static PyObject *
-PyPackageList_marshal (FridaPackageList * list)
+PyPackageList_marshal (MiruPackageList * list)
 {
   PyObject * result;
   gint n, i;
 
-  n = frida_package_list_size (list);
+  n = miru_package_list_size (list);
   result = PyList_New (n);
   for (i = 0; i != n; i++)
-    PyList_SetItem (result, i, PyPackage_new_take_handle (frida_package_list_get (list, i)));
+    PyList_SetItem (result, i, PyPackage_new_take_handle (miru_package_list_get (list, i)));
 
   return result;
 }
 
 
 static PyObject *
-PyPackageSearchResult_new_take_handle (FridaPackageSearchResult * handle)
+PyPackageSearchResult_new_take_handle (MiruPackageSearchResult * handle)
 {
-  return PyGObject_new_take_handle (handle, PYFRIDA_TYPE (PackageSearchResult));
+  return PyGObject_new_take_handle (handle, PYMIRU_TYPE (PackageSearchResult));
 }
 
 static int
@@ -5449,10 +5449,10 @@ PyPackageSearchResult_init (PyPackageSearchResult * self, PyObject * args, PyObj
 }
 
 static void
-PyPackageSearchResult_init_from_handle (PyPackageSearchResult * self, FridaPackageSearchResult * handle)
+PyPackageSearchResult_init_from_handle (PyPackageSearchResult * self, MiruPackageSearchResult * handle)
 {
-  self->packages = PyPackageList_marshal (frida_package_search_result_get_packages (handle));
-  self->total = frida_package_search_result_get_total (handle);
+  self->packages = PyPackageList_marshal (miru_package_search_result_get_packages (handle));
+  self->total = miru_package_search_result_get_total (handle);
 }
 
 static void
@@ -5472,7 +5472,7 @@ PyPackageSearchResult_repr (PyPackageSearchResult * self)
 
   repr = g_string_new ("PackageSearchResult(packages=");
 
-  num_packages = frida_package_list_size (frida_package_search_result_get_packages (PY_GOBJECT_HANDLE (self)));
+  num_packages = miru_package_list_size (miru_package_search_result_get_packages (PY_GOBJECT_HANDLE (self)));
   if (num_packages != 0)
     g_string_append_printf (repr, "[<%u package%s>]", num_packages, (num_packages == 1) ? "" : "s");
   else
@@ -5489,9 +5489,9 @@ PyPackageSearchResult_repr (PyPackageSearchResult * self)
 
 
 static PyObject *
-PyPackageInstallResult_new_take_handle (FridaPackageInstallResult * handle)
+PyPackageInstallResult_new_take_handle (MiruPackageInstallResult * handle)
 {
-  return PyGObject_new_take_handle (handle, PYFRIDA_TYPE (PackageInstallResult));
+  return PyGObject_new_take_handle (handle, PYMIRU_TYPE (PackageInstallResult));
 }
 
 static int
@@ -5506,9 +5506,9 @@ PyPackageInstallResult_init (PyPackageInstallResult * self, PyObject * args, PyO
 }
 
 static void
-PyPackageInstallResult_init_from_handle (PyPackageInstallResult * self, FridaPackageInstallResult * handle)
+PyPackageInstallResult_init_from_handle (PyPackageInstallResult * self, MiruPackageInstallResult * handle)
 {
-  self->packages = PyPackageList_marshal (frida_package_install_result_get_packages (handle));
+  self->packages = PyPackageList_marshal (miru_package_install_result_get_packages (handle));
 }
 
 static void
@@ -5528,7 +5528,7 @@ PyPackageInstallResult_repr (PyPackageInstallResult * self)
 
   repr = g_string_new ("PackageInstallResult(packages=");
 
-  num_packages = frida_package_list_size (frida_package_install_result_get_packages (PY_GOBJECT_HANDLE (self)));
+  num_packages = miru_package_list_size (miru_package_install_result_get_packages (PY_GOBJECT_HANDLE (self)));
   if (num_packages != 0)
     g_string_append_printf (repr, "[<%u package%s>]", num_packages, (num_packages == 1) ? "" : "s");
   else
@@ -5557,7 +5557,7 @@ PyFileMonitor_init (PyFileMonitor * self, PyObject * args, PyObject * kw)
 
   g_atomic_int_inc (&toplevel_objects_alive);
 
-  PyGObject_take_handle (&self->parent, frida_file_monitor_new (path), PYFRIDA_TYPE (FileMonitor));
+  PyGObject_take_handle (&self->parent, miru_file_monitor_new (path), PYMIRU_TYPE (FileMonitor));
 
   return 0;
 }
@@ -5576,12 +5576,12 @@ PyFileMonitor_enable (PyFileMonitor * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_file_monitor_enable_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_file_monitor_enable_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -5590,19 +5590,19 @@ PyFileMonitor_disable (PyFileMonitor * self)
   GError * error = NULL;
 
   Py_BEGIN_ALLOW_THREADS
-  frida_file_monitor_disable_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
+  miru_file_monitor_disable_sync (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 
 static PyObject *
 PyIOStream_new_take_handle (GIOStream * handle)
 {
-  return PyGObject_new_take_handle (handle, PYFRIDA_TYPE (IOStream));
+  return PyGObject_new_take_handle (handle, PYMIRU_TYPE (IOStream));
 }
 
 static int
@@ -5649,9 +5649,9 @@ PyIOStream_close (PyIOStream * self)
   g_io_stream_close (PY_GOBJECT_HANDLE (self), g_cancellable_get_current (), &error);
   Py_END_ALLOW_THREADS
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -5689,7 +5689,7 @@ PyIOStream_read (PyIOStream * self, PyObject * args)
   }
   else
   {
-    result = PyFrida_raise (error);
+    result = PyMiru_raise (error);
 
     Py_DecRef (buffer);
   }
@@ -5729,7 +5729,7 @@ PyIOStream_read_all (PyIOStream * self, PyObject * args)
   }
   else
   {
-    result = PyFrida_raise (error);
+    result = PyMiru_raise (error);
 
     Py_DecRef (buffer);
   }
@@ -5753,7 +5753,7 @@ PyIOStream_write (PyIOStream * self, PyObject * args)
   Py_END_ALLOW_THREADS
 
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
   return PyLong_FromSsize_t (bytes_written);
 }
@@ -5773,9 +5773,9 @@ PyIOStream_write_all (PyIOStream * self, PyObject * args)
   Py_END_ALLOW_THREADS
 
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 
@@ -5787,7 +5787,7 @@ PyCancellable_new_take_handle (GCancellable * handle)
   object = (handle != NULL) ? PyGObject_try_get_from_handle (handle) : NULL;
   if (object == NULL)
   {
-    object = PyObject_CallFunction (PYFRIDA_TYPE_OBJECT (Cancellable), "z#", (char *) &handle, (Py_ssize_t) sizeof (handle));
+    object = PyObject_CallFunction (PYMIRU_TYPE_OBJECT (Cancellable), "z#", (char *) &handle, (Py_ssize_t) sizeof (handle));
   }
   else
   {
@@ -5817,7 +5817,7 @@ PyCancellable_init (PyCancellable * self, PyObject * args, PyObject * kw)
   else
     handle = g_cancellable_new ();
 
-  PyGObject_take_handle (&self->parent, handle, PYFRIDA_TYPE (Cancellable));
+  PyGObject_take_handle (&self->parent, handle, PYMIRU_TYPE (Cancellable));
 
   return 0;
 }
@@ -5845,9 +5845,9 @@ PyCancellable_raise_if_cancelled (PyCancellable * self)
 
   g_cancellable_set_error_if_cancelled (PY_GOBJECT_HANDLE (self), &error);
   if (error != NULL)
-    return PyFrida_raise (error);
+    return PyMiru_raise (error);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -5861,7 +5861,7 @@ PyCancellable_release_fd (PyCancellable * self)
 {
   g_cancellable_release_fd (PY_GOBJECT_HANDLE (self));
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -5882,7 +5882,7 @@ PyCancellable_push_current (PyCancellable * self)
 {
   g_cancellable_push_current (PY_GOBJECT_HANDLE (self));
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static PyObject *
@@ -5895,13 +5895,13 @@ PyCancellable_pop_current (PyCancellable * self)
 
   g_cancellable_pop_current (handle);
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 
 invalid_operation:
   {
-    return PyFrida_raise (g_error_new (
-          FRIDA_ERROR,
-          FRIDA_ERROR_INVALID_OPERATION,
+    return PyMiru_raise (g_error_new (
+          MIRU_ERROR,
+          MIRU_ERROR_INVALID_OPERATION,
           "Cancellable is not on top of the stack"));
   }
 }
@@ -5954,7 +5954,7 @@ PyCancellable_disconnect (PyCancellable * self, PyObject * args)
   g_cancellable_disconnect (PY_GOBJECT_HANDLE (self), handler_id);
   Py_END_ALLOW_THREADS
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 static void
@@ -5991,26 +5991,26 @@ PyCancellable_cancel (PyCancellable * self)
   g_cancellable_cancel (PY_GOBJECT_HANDLE (self));
   Py_END_ALLOW_THREADS
 
-  PyFrida_RETURN_NONE;
+  PyMiru_RETURN_NONE;
 }
 
 
 static void
-PyFrida_object_decref (gpointer obj)
+PyMiru_object_decref (gpointer obj)
 {
   PyObject * o = obj;
   Py_DecRef (o);
 }
 
 static PyObject *
-PyFrida_raise (GError * error)
+PyMiru_raise (GError * error)
 {
   PyObject * exception;
   GString * message;
 
-  if (error->domain == FRIDA_ERROR)
+  if (error->domain == MIRU_ERROR)
   {
-    exception = g_hash_table_lookup (frida_exception_by_error_code, GINT_TO_POINTER (error->code));
+    exception = g_hash_table_lookup (miru_exception_by_error_code, GINT_TO_POINTER (error->code));
     g_assert (exception != NULL);
   }
   else
@@ -6033,7 +6033,7 @@ PyFrida_raise (GError * error)
 }
 
 static gchar *
-PyFrida_repr (PyObject * obj)
+PyMiru_repr (PyObject * obj)
 {
   gchar * result;
   PyObject * repr_value;
@@ -6048,7 +6048,7 @@ PyFrida_repr (PyObject * obj)
 }
 
 static guint
-PyFrida_get_max_argument_count (PyObject * callable)
+PyMiru_get_max_argument_count (PyObject * callable)
 {
   guint result = G_MAXUINT;
   PyObject * spec;
@@ -6085,7 +6085,7 @@ beach:
 
 
 PyMODINIT_FUNC
-PyInit__frida (void)
+PyInit__miru (void)
 {
   PyObject * inspect, * datetime, * module;
 
@@ -6098,66 +6098,66 @@ PyInit__frida (void)
   datetime_constructor = PyObject_GetAttrString (datetime, "datetime");
   Py_DecRef (datetime);
 
-  frida_init ();
+  miru_init ();
 
   PyGObject_class_init ();
 
-  module = PyModule_Create (&PyFrida_moduledef);
+  module = PyModule_Create (&PyMiru_moduledef);
 
-  PyModule_AddStringConstant (module, "__version__", frida_version_string ());
+  PyModule_AddStringConstant (module, "__version__", miru_version_string ());
 
-  PYFRIDA_REGISTER_TYPE (GObject, G_TYPE_OBJECT);
-  PyGObject_tp_init = PyType_GetSlot ((PyTypeObject *) PYFRIDA_TYPE_OBJECT (GObject), Py_tp_init);
-  PyGObject_tp_dealloc = PyType_GetSlot ((PyTypeObject *) PYFRIDA_TYPE_OBJECT (GObject), Py_tp_dealloc);
+  PYMIRU_REGISTER_TYPE (GObject, G_TYPE_OBJECT);
+  PyGObject_tp_init = PyType_GetSlot ((PyTypeObject *) PYMIRU_TYPE_OBJECT (GObject), Py_tp_init);
+  PyGObject_tp_dealloc = PyType_GetSlot ((PyTypeObject *) PYMIRU_TYPE_OBJECT (GObject), Py_tp_dealloc);
 
-  PYFRIDA_REGISTER_TYPE (DeviceManager, FRIDA_TYPE_DEVICE_MANAGER);
-  PYFRIDA_REGISTER_TYPE (Device, FRIDA_TYPE_DEVICE);
-  PYFRIDA_REGISTER_TYPE (Application, FRIDA_TYPE_APPLICATION);
-  PYFRIDA_REGISTER_TYPE (Process, FRIDA_TYPE_PROCESS);
-  PYFRIDA_REGISTER_TYPE (Spawn, FRIDA_TYPE_SPAWN);
-  PYFRIDA_REGISTER_TYPE (Child, FRIDA_TYPE_CHILD);
-  PYFRIDA_REGISTER_TYPE (Crash, FRIDA_TYPE_CRASH);
-  PYFRIDA_REGISTER_TYPE (Bus, FRIDA_TYPE_BUS);
-  PYFRIDA_REGISTER_TYPE (Service, FRIDA_TYPE_SERVICE);
-  PYFRIDA_REGISTER_TYPE (Session, FRIDA_TYPE_SESSION);
-  PYFRIDA_REGISTER_TYPE (Script, FRIDA_TYPE_SCRIPT);
-  PYFRIDA_REGISTER_TYPE (Relay, FRIDA_TYPE_RELAY);
-  PYFRIDA_REGISTER_TYPE (PortalMembership, FRIDA_TYPE_PORTAL_MEMBERSHIP);
-  PYFRIDA_REGISTER_TYPE (PortalService, FRIDA_TYPE_PORTAL_SERVICE);
-  PYFRIDA_REGISTER_TYPE (EndpointParameters, FRIDA_TYPE_ENDPOINT_PARAMETERS);
-  PYFRIDA_REGISTER_TYPE (Compiler, FRIDA_TYPE_COMPILER);
-  PYFRIDA_REGISTER_TYPE (PackageManager, FRIDA_TYPE_PACKAGE_MANAGER);
-  PYFRIDA_REGISTER_TYPE (Package, FRIDA_TYPE_PACKAGE);
-  PYFRIDA_REGISTER_TYPE (PackageSearchResult, FRIDA_TYPE_PACKAGE_SEARCH_RESULT);
-  PYFRIDA_REGISTER_TYPE (PackageInstallResult, FRIDA_TYPE_PACKAGE_INSTALL_RESULT);
-  PYFRIDA_REGISTER_TYPE (FileMonitor, FRIDA_TYPE_FILE_MONITOR);
-  PYFRIDA_REGISTER_TYPE (IOStream, G_TYPE_IO_STREAM);
-  PYFRIDA_REGISTER_TYPE (Cancellable, G_TYPE_CANCELLABLE);
+  PYMIRU_REGISTER_TYPE (DeviceManager, MIRU_TYPE_DEVICE_MANAGER);
+  PYMIRU_REGISTER_TYPE (Device, MIRU_TYPE_DEVICE);
+  PYMIRU_REGISTER_TYPE (Application, MIRU_TYPE_APPLICATION);
+  PYMIRU_REGISTER_TYPE (Process, MIRU_TYPE_PROCESS);
+  PYMIRU_REGISTER_TYPE (Spawn, MIRU_TYPE_SPAWN);
+  PYMIRU_REGISTER_TYPE (Child, MIRU_TYPE_CHILD);
+  PYMIRU_REGISTER_TYPE (Crash, MIRU_TYPE_CRASH);
+  PYMIRU_REGISTER_TYPE (Bus, MIRU_TYPE_BUS);
+  PYMIRU_REGISTER_TYPE (Service, MIRU_TYPE_SERVICE);
+  PYMIRU_REGISTER_TYPE (Session, MIRU_TYPE_SESSION);
+  PYMIRU_REGISTER_TYPE (Script, MIRU_TYPE_SCRIPT);
+  PYMIRU_REGISTER_TYPE (Relay, MIRU_TYPE_RELAY);
+  PYMIRU_REGISTER_TYPE (PortalMembership, MIRU_TYPE_PORTAL_MEMBERSHIP);
+  PYMIRU_REGISTER_TYPE (PortalService, MIRU_TYPE_PORTAL_SERVICE);
+  PYMIRU_REGISTER_TYPE (EndpointParameters, MIRU_TYPE_ENDPOINT_PARAMETERS);
+  PYMIRU_REGISTER_TYPE (Compiler, MIRU_TYPE_COMPILER);
+  PYMIRU_REGISTER_TYPE (PackageManager, MIRU_TYPE_PACKAGE_MANAGER);
+  PYMIRU_REGISTER_TYPE (Package, MIRU_TYPE_PACKAGE);
+  PYMIRU_REGISTER_TYPE (PackageSearchResult, MIRU_TYPE_PACKAGE_SEARCH_RESULT);
+  PYMIRU_REGISTER_TYPE (PackageInstallResult, MIRU_TYPE_PACKAGE_INSTALL_RESULT);
+  PYMIRU_REGISTER_TYPE (FileMonitor, MIRU_TYPE_FILE_MONITOR);
+  PYMIRU_REGISTER_TYPE (IOStream, G_TYPE_IO_STREAM);
+  PYMIRU_REGISTER_TYPE (Cancellable, G_TYPE_CANCELLABLE);
 
-  frida_exception_by_error_code = g_hash_table_new_full (NULL, NULL, NULL, PyFrida_object_decref);
-#define PYFRIDA_DECLARE_EXCEPTION(code, name) \
+  miru_exception_by_error_code = g_hash_table_new_full (NULL, NULL, NULL, PyMiru_object_decref);
+#define PYMIRU_DECLARE_EXCEPTION(code, name) \
     do \
     { \
-      PyObject * exception = PyErr_NewException ("frida." name "Error", NULL, NULL); \
-      g_hash_table_insert (frida_exception_by_error_code, GINT_TO_POINTER (G_PASTE (FRIDA_ERROR_, code)), exception); \
+      PyObject * exception = PyErr_NewException ("miru." name "Error", NULL, NULL); \
+      g_hash_table_insert (miru_exception_by_error_code, GINT_TO_POINTER (G_PASTE (MIRU_ERROR_, code)), exception); \
       Py_IncRef (exception); \
       PyModule_AddObject (module, name "Error", exception); \
     } while (FALSE)
-  PYFRIDA_DECLARE_EXCEPTION (SERVER_NOT_RUNNING, "ServerNotRunning");
-  PYFRIDA_DECLARE_EXCEPTION (EXECUTABLE_NOT_FOUND, "ExecutableNotFound");
-  PYFRIDA_DECLARE_EXCEPTION (EXECUTABLE_NOT_SUPPORTED, "ExecutableNotSupported");
-  PYFRIDA_DECLARE_EXCEPTION (PROCESS_NOT_FOUND, "ProcessNotFound");
-  PYFRIDA_DECLARE_EXCEPTION (PROCESS_NOT_RESPONDING, "ProcessNotResponding");
-  PYFRIDA_DECLARE_EXCEPTION (INVALID_ARGUMENT, "InvalidArgument");
-  PYFRIDA_DECLARE_EXCEPTION (INVALID_OPERATION, "InvalidOperation");
-  PYFRIDA_DECLARE_EXCEPTION (PERMISSION_DENIED, "PermissionDenied");
-  PYFRIDA_DECLARE_EXCEPTION (ADDRESS_IN_USE, "AddressInUse");
-  PYFRIDA_DECLARE_EXCEPTION (TIMED_OUT, "TimedOut");
-  PYFRIDA_DECLARE_EXCEPTION (NOT_SUPPORTED, "NotSupported");
-  PYFRIDA_DECLARE_EXCEPTION (PROTOCOL, "Protocol");
-  PYFRIDA_DECLARE_EXCEPTION (TRANSPORT, "Transport");
+  PYMIRU_DECLARE_EXCEPTION (SERVER_NOT_RUNNING, "ServerNotRunning");
+  PYMIRU_DECLARE_EXCEPTION (EXECUTABLE_NOT_FOUND, "ExecutableNotFound");
+  PYMIRU_DECLARE_EXCEPTION (EXECUTABLE_NOT_SUPPORTED, "ExecutableNotSupported");
+  PYMIRU_DECLARE_EXCEPTION (PROCESS_NOT_FOUND, "ProcessNotFound");
+  PYMIRU_DECLARE_EXCEPTION (PROCESS_NOT_RESPONDING, "ProcessNotResponding");
+  PYMIRU_DECLARE_EXCEPTION (INVALID_ARGUMENT, "InvalidArgument");
+  PYMIRU_DECLARE_EXCEPTION (INVALID_OPERATION, "InvalidOperation");
+  PYMIRU_DECLARE_EXCEPTION (PERMISSION_DENIED, "PermissionDenied");
+  PYMIRU_DECLARE_EXCEPTION (ADDRESS_IN_USE, "AddressInUse");
+  PYMIRU_DECLARE_EXCEPTION (TIMED_OUT, "TimedOut");
+  PYMIRU_DECLARE_EXCEPTION (NOT_SUPPORTED, "NotSupported");
+  PYMIRU_DECLARE_EXCEPTION (PROTOCOL, "Protocol");
+  PYMIRU_DECLARE_EXCEPTION (TRANSPORT, "Transport");
 
-  cancelled_exception = PyErr_NewException ("frida.OperationCancelledError", NULL, NULL);
+  cancelled_exception = PyErr_NewException ("miru.OperationCancelledError", NULL, NULL);
   Py_IncRef (cancelled_exception);
   PyModule_AddObject (module, "OperationCancelledError", cancelled_exception);
 

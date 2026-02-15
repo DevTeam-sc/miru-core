@@ -1,13 +1,13 @@
 import sys
 
-import frida
+import miru
 
 
 def on_message(message):
     print("on_message:", message)
 
 
-device = frida.get_usb_device()
+device = miru.get_usb_device()
 
 opengl = device.open_service("dtx:com.apple.instruments.server.services.graphics.opengl")
 opengl.on("message", on_message)

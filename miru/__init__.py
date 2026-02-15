@@ -1,46 +1,87 @@
+import sys
+from importlib.machinery import EXTENSION_SUFFIXES
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+
+def _maybe_extend_package_path_for_meson() -> None:
+    """
+    Meson places the compiled native extension in the build directory.
+
+    When importing from the source tree, we extend this package's search path so
+    `from . import _miru` can resolve the extension from the build output.
+    """
+
+    package_dir = Path(__file__).resolve().parent
+
+    try:
+        miru_library_dir = Path(__file__).resolve().parents[3]
+    except IndexError:
+        return
+
+    build_package_dir = miru_library_dir / "build" / "subprojects" / "miru-python" / "miru"
+    if not build_package_dir.is_dir() or build_package_dir == package_dir:
+        return
+
+    has_extension = any(
+        (build_package_dir / "_miru" / ("_miru" + suffix)).is_file()
+        or (build_package_dir / ("_miru" + suffix)).is_file()
+        for suffix in EXTENSION_SUFFIXES
+    )
+    if not has_extension:
+        return
+
+    build_dir = str(build_package_dir)
+    if build_dir not in __path__:
+        __path__.append(build_dir)
+
+
+_maybe_extend_package_path_for_meson()
+
 try:
-    from . import _frida
+    from . import _miru as _miru
+    if not hasattr(_miru, "__version__"):
+        from ._miru import _miru as _miru
+        sys.modules[__name__ + "._miru"] = _miru
 except Exception as ex:
     print("")
     print("***")
     if str(ex).startswith("No module named "):
-        print("Frida native extension not found")
+        print("Miru native extension not found")
         print("Please check your PYTHONPATH.")
     else:
-        print(f"Failed to load the Frida native extension: {ex}")
+        print(f"Failed to load the Miru native extension: {ex}")
         print("Please ensure that the extension was compiled correctly")
     print("***")
     print("")
     raise ex
 from . import core
 
-__version__: str = _frida.__version__
+__version__: str = _miru.__version__
 
 get_device_manager = core.get_device_manager
-Relay = _frida.Relay
+Relay = _miru.Relay
 PortalService = core.PortalService
 EndpointParameters = core.EndpointParameters
 Compiler = core.Compiler
 PackageManager = core.PackageManager
-FileMonitor = _frida.FileMonitor
+FileMonitor = _miru.FileMonitor
 Cancellable = core.Cancellable
 
-ServerNotRunningError = _frida.ServerNotRunningError
-ExecutableNotFoundError = _frida.ExecutableNotFoundError
-ExecutableNotSupportedError = _frida.ExecutableNotSupportedError
-ProcessNotFoundError = _frida.ProcessNotFoundError
-ProcessNotRespondingError = _frida.ProcessNotRespondingError
-InvalidArgumentError = _frida.InvalidArgumentError
-InvalidOperationError = _frida.InvalidOperationError
-PermissionDeniedError = _frida.PermissionDeniedError
-AddressInUseError = _frida.AddressInUseError
-TimedOutError = _frida.TimedOutError
-NotSupportedError = _frida.NotSupportedError
-ProtocolError = _frida.ProtocolError
-TransportError = _frida.TransportError
-OperationCancelledError = _frida.OperationCancelledError
+ServerNotRunningError = _miru.ServerNotRunningError
+ExecutableNotFoundError = _miru.ExecutableNotFoundError
+ExecutableNotSupportedError = _miru.ExecutableNotSupportedError
+ProcessNotFoundError = _miru.ProcessNotFoundError
+ProcessNotRespondingError = _miru.ProcessNotRespondingError
+InvalidArgumentError = _miru.InvalidArgumentError
+InvalidOperationError = _miru.InvalidOperationError
+PermissionDeniedError = _miru.PermissionDeniedError
+AddressInUseError = _miru.AddressInUseError
+TimedOutError = _miru.TimedOutError
+NotSupportedError = _miru.NotSupportedError
+ProtocolError = _miru.ProtocolError
+TransportError = _miru.TransportError
+OperationCancelledError = _miru.OperationCancelledError
 
 
 def query_system_parameters() -> Dict[str, Any]:

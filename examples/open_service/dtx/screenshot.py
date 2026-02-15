@@ -1,13 +1,13 @@
 import sys
 
-import frida
+import miru
 
 if len(sys.argv) != 2:
     print(f"Usage: {sys.argv[0]} outfile.png", file=sys.stderr)
     sys.exit(1)
 outfile = sys.argv[1]
 
-device = frida.get_usb_device()
+device = miru.get_usb_device()
 
 screenshot = device.open_service("dtx:com.apple.instruments.server.services.screenshot")
 png = screenshot.request({"method": "takeScreenshot"})

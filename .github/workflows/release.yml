@@ -1,0 +1,126 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 16.5.7). Used for manual runs."
+        required: false
+        default: ""
+      publish:
+        description: "Publish wheels to PyPI"
+        required: false
+        default: "false"
+
+jobs:
+  wheels:
+    name: wheels (${{ matrix.os }} ${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x86_64
+            cibw_archs: x86_64
+          - os: ubuntu-latest
+            arch: x86_64
+            cibw_archs: x86_64
+          - os: ubuntu-latest
+            arch: aarch64
+            cibw_archs: aarch64
+          - os: macos-13
+            arch: x86_64
+            cibw_archs: x86_64
+          - os: macos-14
+            arch: arm64
+            cibw_archs: arm64
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up QEMU (Linux aarch64)
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.arch == 'aarch64' }}
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve version
+        id: vars
+        shell: bash
+        env:
+          MANUAL_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${MANUAL_VERSION}" ]]; then
+            echo "version=${MANUAL_VERSION}" >> "$GITHUB_OUTPUT"
+          else
+            ref="${GITHUB_REF_NAME:-v0.0.0}"
+            echo "version=${ref#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build wheels (miru-core)
+        env:
+          MIRU_VERSION: ${{ steps.vars.outputs.version }}
+          CIBW_ARCHS: ${{ matrix.cibw_archs }}
+          CIBW_BUILD: "cp39-*"
+          CIBW_SKIP: "pp*"
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -U pip
+          python -m pip install "cibuildwheel==2.19.2"
+          python -m cibuildwheel --output-dir dist/wheels
+
+      - name: Smoke test (install wheel + import)
+        if: ${{ matrix.arch != 'aarch64' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv venv
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            py="venv/Scripts/python.exe"
+          else
+            py="venv/bin/python"
+          fi
+          "$py" -m pip install -U pip
+          "$py" -m pip install dist/wheels/miru_core-*.whl
+          "$py" -c "import miru; print(miru.__version__)"
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/wheels/*.whl
+
+  publish_pypi:
+    name: publish (PyPI)
+    needs: wheels
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag' || inputs.publish == 'true'
+    permissions:
+      id-token: write
+    steps:
+      - name: Download wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/wheels
+          pattern: wheels-*
+          merge-multiple: true
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages-dir: dist/wheels

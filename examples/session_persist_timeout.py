@@ -1,6 +1,6 @@
-from frida_tools.application import Reactor
+from miru_tools.application import Reactor
 
-import frida
+import miru
 
 
 class Application:
@@ -15,7 +15,7 @@ class Application:
         self._reactor.run()
 
     def _start(self):
-        device = frida.get_remote_device()
+        device = miru.get_remote_device()
         self._device = device
 
         session = self._device.attach("hello2", persist_timeout=30)

@@ -1,6 +1,6 @@
-import frida
+import miru
 
-session = frida.attach("Twitter")
+session = miru.attach("Twitter")
 script = session.create_script(
     """\
 rpc.exports = {

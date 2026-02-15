@@ -1,16 +1,16 @@
 import Vue from 'vue';
 import Vuex from 'vuex';
 
-import frida from './modules/frida';
-import fridaBus from './plugins/frida';
+import miru from './modules/miru';
+import miruBus from './plugins/miru';
 
 Vue.use(Vuex);
 
 export default new Vuex.Store({
   modules: {
-    frida
+    miru
   },
   plugins: [
-    fridaBus()
+    miruBus()
   ]
 });

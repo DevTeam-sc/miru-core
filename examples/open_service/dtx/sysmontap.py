@@ -1,13 +1,13 @@
 import time
 
-import frida
+import miru
 
 
 def on_message(message):
     print("on_message:", message)
 
 
-device = frida.get_usb_device()
+device = miru.get_usb_device()
 
 sysmon = device.open_service("dtx:com.apple.instruments.server.services.sysmontap")
 sysmon.on("message", on_message)

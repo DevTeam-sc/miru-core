@@ -3,21 +3,21 @@ import threading
 import time
 import unittest
 
-import frida
+import miru
 
 from .data import target_program
 
 
 class TestRpc(unittest.TestCase):
     target: subprocess.Popen
-    session: frida.core.Session
+    session: miru.core.Session
 
     @classmethod
     def setUp(cls):
         cls.target = subprocess.Popen([target_program], stdin=subprocess.PIPE)
         # TODO: improve injectors to handle injection into a process that hasn't yet finished initializing
         time.sleep(0.05)
-        cls.session = frida.attach(cls.target.pid)
+        cls.session = miru.attach(cls.target.pid)
 
     @classmethod
     def tearDown(cls):
@@ -146,7 +146,7 @@ rpc.exports = {
             time.sleep(0.1)
             cancellable.cancel()
 
-        cancellable = frida.Cancellable()
+        cancellable = miru.Cancellable()
         threading.Thread(target=cancel_after_100ms).start()
         self.assertRaisesOperationCancelled(lambda: agent.wait_forever(cancellable=cancellable))
         self.assertEqual(script._pending, {})
@@ -155,16 +155,16 @@ rpc.exports = {
             with cancellable:
                 agent.wait_forever()
 
-        cancellable = frida.Cancellable()
+        cancellable = miru.Cancellable()
         threading.Thread(target=cancel_after_100ms).start()
         self.assertRaisesOperationCancelled(call_wait_forever_with_cancellable)
         self.assertEqual(script._pending, {})
 
     def assertRaisesScriptDestroyed(self, operation):
-        self.assertRaisesRegex(frida.InvalidOperationError, "script has been destroyed", operation)
+        self.assertRaisesRegex(miru.InvalidOperationError, "script has been destroyed", operation)
 
     def assertRaisesOperationCancelled(self, operation):
-        self.assertRaisesRegex(frida.OperationCancelledError, "operation was cancelled", operation)
+        self.assertRaisesRegex(miru.OperationCancelledError, "operation was cancelled", operation)
 
 
 if __name__ == "__main__":

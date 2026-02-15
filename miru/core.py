@@ -43,14 +43,14 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import NotRequired, cast
 
-from . import _frida
+from . import _miru
 
 _device_manager = None
 
-_Cancellable = _frida.Cancellable
+_Cancellable = _miru.Cancellable
 
 ProcessTarget = Union[int, str]
-Spawn = _frida.Spawn
+Spawn = _miru.Spawn
 
 
 @dataclasses.dataclass
@@ -67,7 +67,7 @@ def get_device_manager() -> "DeviceManager":
 
     global _device_manager
     if _device_manager is None:
-        _device_manager = DeviceManager(_frida.DeviceManager())
+        _device_manager = DeviceManager(_miru.DeviceManager())
     return _device_manager
 
 
@@ -98,10 +98,10 @@ def cancellable(f: Callable[P, R]) -> Callable[P, R]:
 
 class IOStream:
     """
-    Frida's own implementation of an input/output stream
+    Miru's own implementation of an input/output stream
     """
 
-    def __init__(self, impl: _frida.IOStream) -> None:
+    def __init__(self, impl: _miru.IOStream) -> None:
         self._impl = impl
 
     def __repr__(self) -> str:
@@ -157,7 +157,7 @@ class IOStream:
 
 
 class PortalMembership:
-    def __init__(self, impl: _frida.PortalMembership) -> None:
+    def __init__(self, impl: _miru.PortalMembership) -> None:
         self._impl = impl
 
     @cancellable
@@ -259,7 +259,7 @@ class RPCException(Exception):
 
 
 class Script:
-    def __init__(self, impl: _frida.Script) -> None:
+    def __init__(self, impl: _miru.Script) -> None:
         self.exports_sync = ScriptExportsSync(self)
         self.exports_async = ScriptExportsAsync(self)
 
@@ -269,7 +269,7 @@ class Script:
         self._log_handler: Callable[[str, str], None] = self.default_log_handler
 
         self._pending: Dict[
-            int, Callable[[Optional[Any], Optional[Union[RPCException, _frida.InvalidOperationError]]], None]
+            int, Callable[[Optional[Any], Optional[Union[RPCException, _miru.InvalidOperationError]]], None]
         ] = {}
         self._next_request_id = 1
         self._cond = threading.Condition()
@@ -447,7 +447,7 @@ class Script:
         loop = asyncio.get_event_loop()
         future: asyncio.Future[Any] = asyncio.Future()
 
-        def on_complete(value: Any, error: Optional[Union[RPCException, _frida.InvalidOperationError]]) -> None:
+        def on_complete(value: Any, error: Optional[Union[RPCException, _miru.InvalidOperationError]]) -> None:
             if error is not None:
                 loop.call_soon_threadsafe(future.set_exception, error)
             else:
@@ -466,7 +466,7 @@ class Script:
     def _rpc_request(self, args: Any, data: Optional[bytes] = None) -> Any:
         result = RPCResult()
 
-        def on_complete(value: Any, error: Optional[Union[RPCException, _frida.InvalidOperationError]]) -> None:
+        def on_complete(value: Any, error: Optional[Union[RPCException, _miru.InvalidOperationError]]) -> None:
             with self._cond:
                 result.finished = True
                 result.value = value
@@ -501,7 +501,7 @@ class Script:
         return result.value
 
     def _append_pending(
-        self, callback: Callable[[Any, Optional[Union[RPCException, _frida.InvalidOperationError]]], None]
+        self, callback: Callable[[Any, Optional[Union[RPCException, _miru.InvalidOperationError]]], None]
     ) -> int:
         with self._cond:
             request_id = self._next_request_id
@@ -510,7 +510,7 @@ class Script:
         return request_id
 
     def _send_rpc_call(self, request_id: int, args: Any, data: Optional[bytes]) -> None:
-        self.post(["frida:rpc", request_id, *args], data)
+        self.post(["miru:rpc", request_id, *args], data)
 
     def _on_rpc_message(self, request_id: int, operation: str, params: List[Any], data: Optional[Any]) -> None:
         if operation in ("ok", "error"):
@@ -542,7 +542,7 @@ class Script:
             if next_pending is None:
                 break
 
-            next_pending(None, _frida.InvalidOperationError("script has been destroyed"))
+            next_pending(None, _miru.InvalidOperationError("script has been destroyed"))
 
     def _on_message(self, raw_message: str, data: Optional[bytes]) -> None:
         message = json.loads(raw_message)
@@ -553,7 +553,7 @@ class Script:
             level = message["level"]
             text = payload
             self._log_handler(level, text)
-        elif mtype == "send" and isinstance(payload, list) and len(payload) > 0 and payload[0] == "frida:rpc":
+        elif mtype == "send" and isinstance(payload, list) and len(payload) > 0 and payload[0] == "miru:rpc":
             request_id = payload[1]
             operation = payload[2]
             params = payload[3:]
@@ -571,14 +571,14 @@ SessionDetachedCallback = Callable[
         Literal[
             "application-requested", "process-replaced", "process-terminated", "connection-terminated", "device-lost"
         ],
-        Optional[_frida.Crash],
+        Optional[_miru.Crash],
     ],
     None,
 ]
 
 
 class Session:
-    def __init__(self, impl: _frida.Session) -> None:
+    def __init__(self, impl: _miru.Session) -> None:
         self._impl = impl
 
     def __repr__(self) -> str:
@@ -669,7 +669,7 @@ class Session:
 
     @cancellable
     def setup_peer_connection(
-        self, stun_server: Optional[str] = None, relays: Optional[Sequence[_frida.Relay]] = None
+        self, stun_server: Optional[str] = None, relays: Optional[Sequence[_miru.Relay]] = None
     ) -> None:
         """
         Set up a peer connection with the target process
@@ -723,7 +723,7 @@ BusMessageCallback = Callable[[Mapping[Any, Any], Optional[bytes]], None]
 
 
 class Bus:
-    def __init__(self, impl: _frida.Bus) -> None:
+    def __init__(self, impl: _miru.Bus) -> None:
         self._impl = impl
         self._on_message_callbacks: List[Callable[..., Any]] = []
 
@@ -794,7 +794,7 @@ ServiceMessageCallback = Callable[[Any], None]
 
 
 class Service:
-    def __init__(self, impl: _frida.Service) -> None:
+    def __init__(self, impl: _miru.Service) -> None:
         self._impl = impl
 
     @cancellable
@@ -847,11 +847,11 @@ class Service:
         self._impl.off(signal, callback)
 
 
-DeviceSpawnAddedCallback = Callable[[_frida.Spawn], None]
-DeviceSpawnRemovedCallback = Callable[[_frida.Spawn], None]
-DeviceChildAddedCallback = Callable[[_frida.Child], None]
-DeviceChildRemovedCallback = Callable[[_frida.Child], None]
-DeviceProcessCrashedCallback = Callable[[_frida.Crash], None]
+DeviceSpawnAddedCallback = Callable[[_miru.Spawn], None]
+DeviceSpawnRemovedCallback = Callable[[_miru.Spawn], None]
+DeviceChildAddedCallback = Callable[[_miru.Child], None]
+DeviceChildRemovedCallback = Callable[[_miru.Child], None]
+DeviceProcessCrashedCallback = Callable[[_miru.Crash], None]
 DeviceOutputCallback = Callable[[int, int, bytes], None]
 DeviceUninjectedCallback = Callable[[int], None]
 DeviceLostCallback = Callable[[], None]
@@ -859,10 +859,10 @@ DeviceLostCallback = Callable[[], None]
 
 class Device:
     """
-    Represents a device that Frida connects to
+    Represents a device that Miru connects to
     """
 
-    def __init__(self, device: _frida.Device) -> None:
+    def __init__(self, device: _miru.Device) -> None:
         assert device.bus is not None
         self.id = device.id
         self.name = device.name
@@ -892,7 +892,7 @@ class Device:
         return self._impl.query_system_parameters()
 
     @cancellable
-    def get_frontmost_application(self, scope: Optional[str] = None) -> Optional[_frida.Application]:
+    def get_frontmost_application(self, scope: Optional[str] = None) -> Optional[_miru.Application]:
         """
         Get details about the frontmost application
         """
@@ -904,7 +904,7 @@ class Device:
     @cancellable
     def enumerate_applications(
         self, identifiers: Optional[Sequence[str]] = None, scope: Optional[str] = None
-    ) -> List[_frida.Application]:
+    ) -> List[_miru.Application]:
         """
         Enumerate applications
         """
@@ -916,7 +916,7 @@ class Device:
     @cancellable
     def enumerate_processes(
         self, pids: Optional[Sequence[int]] = None, scope: Optional[str] = None
-    ) -> List[_frida.Process]:
+    ) -> List[_miru.Process]:
         """
         Enumerate processes
         """
@@ -926,7 +926,7 @@ class Device:
         return self._impl.enumerate_processes(**kwargs)  # type: ignore
 
     @cancellable
-    def get_process(self, process_name: str) -> _frida.Process:
+    def get_process(self, process_name: str) -> _miru.Process:
         """
         Get the process with the given name
         :raises ProcessNotFoundError: if the process was not found or there were more than one process with the given name
@@ -942,9 +942,9 @@ class Device:
             return matching[0]
         elif len(matching) > 1:
             matches_list = ", ".join([f"{process.name} (pid: {process.pid})" for process in matching])
-            raise _frida.ProcessNotFoundError(f"ambiguous name; it matches: {matches_list}")
+            raise _miru.ProcessNotFoundError(f"ambiguous name; it matches: {matches_list}")
         else:
-            raise _frida.ProcessNotFoundError(f"unable to find process with name '{process_name}'")
+            raise _miru.ProcessNotFoundError(f"unable to find process with name '{process_name}'")
 
     @cancellable
     def enable_spawn_gating(self) -> None:
@@ -963,7 +963,7 @@ class Device:
         self._impl.disable_spawn_gating()
 
     @cancellable
-    def enumerate_pending_spawn(self) -> List[_frida.Spawn]:
+    def enumerate_pending_spawn(self) -> List[_miru.Spawn]:
         """
         Enumerate pending spawn
         """
@@ -971,7 +971,7 @@ class Device:
         return self._impl.enumerate_pending_spawn()
 
     @cancellable
-    def enumerate_pending_children(self) -> List[_frida.Child]:
+    def enumerate_pending_children(self) -> List[_miru.Child]:
         """
         Enumerate pending children
         """
@@ -1167,13 +1167,13 @@ class Device:
             return target
 
 
-DeviceManagerAddedCallback = Callable[[_frida.Device], None]
-DeviceManagerRemovedCallback = Callable[[_frida.Device], None]
+DeviceManagerAddedCallback = Callable[[_miru.Device], None]
+DeviceManagerRemovedCallback = Callable[[_miru.Device], None]
 DeviceManagerChangedCallback = Callable[[], None]
 
 
 class DeviceManager:
-    def __init__(self, impl: _frida.DeviceManager) -> None:
+    def __init__(self, impl: _miru.DeviceManager) -> None:
         self._impl = impl
 
     def __repr__(self) -> str:
@@ -1322,11 +1322,11 @@ class EndpointParameters:
             else:
                 raise ValueError("invalid authentication scheme")
 
-        self._impl = _frida.EndpointParameters(**kwargs)
+        self._impl = _miru.EndpointParameters(**kwargs)
 
 
-PortalServiceNodeJoinedCallback = Callable[[int, _frida.Application], None]
-PortalServiceNodeLeftCallback = Callable[[int, _frida.Application], None]
+PortalServiceNodeJoinedCallback = Callable[[int, _miru.Application], None]
+PortalServiceNodeLeftCallback = Callable[[int, _miru.Application], None]
 PortalServiceNodeConnectedCallback = Callable[[int, Tuple[str, int]], None]
 PortalServiceNodeDisconnectedCallback = Callable[[int, Tuple[str, int]], None]
 PortalServiceControllerConnectedCallback = Callable[[int, Tuple[str, int]], None]
@@ -1345,7 +1345,7 @@ class PortalService:
         args = [cluster_params._impl]
         if control_params is not None:
             args.append(control_params._impl)
-        impl = _frida.PortalService(*args)
+        impl = _miru.PortalService(*args)
 
         self.device = impl.device
         self._impl = impl
@@ -1522,12 +1522,12 @@ CompilerBundleFormat = Literal["esm", "iife"]
 CompilerTypeCheck = Literal["full", "none"]
 CompilerSourceMaps = Literal["included", "omitted"]
 CompilerCompression = Literal["none", "terser"]
-CompilerPlatform = Literal["neutral", "gum", "browser"]
+CompilerPlatform = Literal["neutral", "mumu", "browser"]
 
 
 class Compiler:
     def __init__(self) -> None:
-        self._impl = _frida.Compiler()
+        self._impl = _miru.Compiler()
 
     def __repr__(self) -> str:
         return repr(self._impl)
@@ -1647,7 +1647,7 @@ PackageRole = Literal["runtime", "development", "optional", "peer"]
 
 class PackageManager:
     def __init__(self) -> None:
-        self._impl = _frida.PackageManager()
+        self._impl = _miru.PackageManager()
 
     def __repr__(self) -> str:
         return repr(self._impl)
@@ -1666,7 +1666,7 @@ class PackageManager:
         query: str,
         offset: Optional[int] = None,
         limit: Optional[int] = None,
-    ) -> _frida.PackageSearchResult:
+    ) -> _miru.PackageSearchResult:
         kwargs = {
             "offset": offset,
             "limit": limit,
@@ -1681,7 +1681,7 @@ class PackageManager:
         role: Optional[PackageRole] = None,
         specs: Optional[Sequence[str]] = None,
         omits: Optional[Sequence[PackageRole]] = None,
-    ) -> _frida.PackageInstallResult:
+    ) -> _miru.PackageInstallResult:
         kwargs: Dict[str, Any] = {
             "project_root": project_root,
             "role": role,
@@ -1755,7 +1755,7 @@ class Cancellable:
         return CancellablePollFD(self._impl)
 
     @classmethod
-    def get_current(cls) -> _frida.Cancellable:
+    def get_current(cls) -> _miru.Cancellable:
         """
         Get the top cancellable from the stack
         """

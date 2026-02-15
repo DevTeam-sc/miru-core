@@ -1,6 +1,6 @@
-import frida
+import miru
 
-device = frida.get_usb_device()
+device = miru.get_usb_device()
 
 channel = device.open_channel("tcp:21")
 print("Got channel:", channel)

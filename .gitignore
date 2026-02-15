@@ -1,6 +1,8 @@
 *.pyc
+__pycache__/
 /*.egg-info/
 /build/
 /deps/
 /dist/
 /subprojects/*
+!/subprojects/*.wrap

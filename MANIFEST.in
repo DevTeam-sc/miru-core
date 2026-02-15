@@ -1,9 +1,9 @@
 include meson.build
-include frida/meson.build
-include frida/_frida/extension.c
-include frida/_frida/extension.version
-include frida/_frida/meson.build
-include subprojects/frida-core.wrap
+include miru/meson.build
+include miru/_miru/extension.c
+include miru/_miru/extension.version
+include miru/_miru/meson.build
+include subprojects/miru-core.wrap
 
 include BSDmakefile
 include Makefile
