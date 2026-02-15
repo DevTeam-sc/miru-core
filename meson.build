@@ -21,7 +21,7 @@ endif
 
 python_dep = python.dependency()
 miru_core_dep = dependency('miru-core-1.0',
-  fallback: ['miru-core', 'miru_core_dep'],
+  fallback: 'miru-core',
   default_options: [
   'miru_version=' + meson.project_version().replace('.dev', '-dev.'),
 ])
