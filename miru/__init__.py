@@ -40,8 +40,10 @@ _maybe_extend_package_path_for_meson()
 
 try:
     from . import _miru as _miru
+
     if not hasattr(_miru, "__version__"):
         from ._miru import _miru as _miru
+
         sys.modules[__name__ + "._miru"] = _miru
 except Exception as ex:
     print("")
